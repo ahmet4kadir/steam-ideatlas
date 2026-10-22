@@ -16,14 +16,14 @@ Kullanım:
   python steam_crawl.py --export games.jsonl          # analiz için dışa aktar
 """
 import argparse, html, json, os, re, sqlite3, sys, time
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 
 DB = os.environ.get("STEAM_DB", "steam.db")
 UA = {"User-Agent": "Mozilla/5.0 (steam-map-research; contact: ahmetkadir.com)"}
 S = requests.Session(); S.headers.update(UA)
 
-DETAILS_INTERVAL = 1.55   # 200 istek / 5 dk sınırının hemen altında
+DETAILS_INTERVAL = 1.70   # 200 istek / 5 dk; 1.55 tam sınırda 429 yiyordu
 REVIEWS_INTERVAL = 0.6
 SPY_INTERVAL     = 1.05
 
@@ -51,7 +51,7 @@ def db():
     """)
     return c
 
-def now(): return datetime.utcnow().isoformat(timespec="seconds")
+def now(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 def strip_html(s):
     if not s: return ""
