@@ -9,13 +9,6 @@ services:
     command: sh -c "python steam_crawl.py --stage applist && python steam_crawl.py --stage details"
     restart: unless-stopped
 
-  reviews:
-    build: .
-    volumes:
-      - steamdata:/data
-    # details'ın 'game' olarak işaretlediklerini sürekli tarar, yeni yoksa 10 dk bekler
-    command: sh -c "sleep 300; while true; do python steam_crawl.py --stage reviews; sleep 600; done"
-    restart: unless-stopped
 
   spy:
     build: .

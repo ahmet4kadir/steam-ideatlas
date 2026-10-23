@@ -5,8 +5,8 @@ Steam tam katalog çekici — resumable (SQLite checkpoint).
 Aşamalar:
   1) applist   : tüm oyun appid'leri  (STEAM_API_KEY varsa sadece 'game' tipi, yoksa tüm liste)
   2) details   : store appdetails (açıklama, tür, kategori, tarih, fiyat...)  ~1.5 s/istek
-  3) reviews   : toplam review sayısı (population)
-  4) spy       : SteamSpy tag'leri + owner tahmini
+  3) spy       : SteamSpy tag'leri + owner tahmini + pozitif/negatif review sayıları
+  (reviews aşaması opsiyonel: store appreviews, appdetails ile limit paylaşıyor; --stage reviews ile ayrıca)
 
 Kullanım:
   pip install requests
@@ -49,7 +49,24 @@ def db():
         ccu INTEGER, fetched_at TEXT);
     CREATE INDEX IF NOT EXISTS idx_type ON details(type);
     """)
+    c.execute("PRAGMA busy_timeout=120000")
+    cols = [r[1] for r in c.execute("PRAGMA table_info(spy)")]
+    if "positive" not in cols:
+        c.execute("ALTER TABLE spy ADD COLUMN positive INTEGER")
+        c.execute("ALTER TABLE spy ADD COLUMN negative INTEGER")
+        c.execute("UPDATE apps SET spy_status=NULL WHERE spy_status='ok'")   # yeniden çek
+        c.commit()
     return c
+
+def write(c, sql, params=()):
+    """Kısa transaction: yaz, hemen commit. Kilitliyse bekle-tekrar dene (crash yok)."""
+    for i in range(60):
+        try:
+            c.execute(sql, params); c.commit(); return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) and "busy" not in str(e): raise
+            time.sleep(2)
+    raise RuntimeError("DB 2 dk boyunca kilitli kaldı")
 
 def now(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -114,18 +131,18 @@ def stage_details(c, limit=None):
         r = get("https://store.steampowered.com/api/appdetails",
                 {"appids": appid, "cc": "us", "l": "english"}, interval=DETAILS_INTERVAL)
         if r is None:
-            c.execute("UPDATE apps SET details_status='err' WHERE appid=?", (appid,)); c.commit(); continue
+            write(c, "UPDATE apps SET details_status='err' WHERE appid=?", (appid,)); continue
         try:
             d = r.json().get(str(appid), {})
         except ValueError:
             d = {}
         if not d.get("success"):
-            c.execute("UPDATE apps SET details_status='missing' WHERE appid=?", (appid,))
+            write(c, "UPDATE apps SET details_status='missing' WHERE appid=?", (appid,))
         else:
             x = d["data"]
             rd = x.get("release_date", {}) or {}
             po = x.get("price_overview") or {}
-            c.execute("""INSERT OR REPLACE INTO details VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+            write(c, """INSERT OR REPLACE INTO details VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 appid, x.get("type"), x.get("name"), int(bool(x.get("is_free"))),
                 strip_html(x.get("short_description")), strip_html(x.get("about_the_game")),
                 json.dumps([g["description"] for g in x.get("genres", [])], ensure_ascii=False),
@@ -136,9 +153,8 @@ def stage_details(c, limit=None):
                 po.get("final"), po.get("currency"), x.get("header_image"),
                 (x.get("metacritic") or {}).get("score"), (x.get("recommendations") or {}).get("total"),
                 json.dumps(x.get("platforms", {})), json.dumps(x, ensure_ascii=False), now()))
-            c.execute("UPDATE apps SET details_status=? WHERE appid=?", (x.get("type"), appid))
+            write(c, "UPDATE apps SET details_status=? WHERE appid=?", (x.get("type"), appid))
         if i % 25 == 0:
-            c.commit()
             rate = i / (time.time() - t0)
             print(f"   {i}/{total}  {rate*3600:.0f}/saat  kalan ~{(total-i)/rate/3600:.1f} saat")
     c.commit()
@@ -153,17 +169,17 @@ def stage_reviews(c, limit=None):
         r = get(f"https://store.steampowered.com/appreviews/{appid}",
                 {"json": 1, "language": "all", "purchase_type": "all", "num_per_page": 0}, interval=REVIEWS_INTERVAL)
         if r is None:
-            c.execute("UPDATE apps SET reviews_status='err' WHERE appid=?", (appid,)); continue
+            write(c, "UPDATE apps SET reviews_status='err' WHERE appid=?", (appid,)); continue
         try:
             q = r.json().get("query_summary", {})
-            c.execute("INSERT OR REPLACE INTO reviews VALUES(?,?,?,?,?,?)",
-                      (appid, q.get("total_reviews", 0), q.get("total_positive", 0),
-                       q.get("total_negative", 0), q.get("review_score_desc"), now()))
-            c.execute("UPDATE apps SET reviews_status='ok' WHERE appid=?", (appid,))
+            write(c, "INSERT OR REPLACE INTO reviews VALUES(?,?,?,?,?,?)",
+                  (appid, q.get("total_reviews", 0), q.get("total_positive", 0),
+                   q.get("total_negative", 0), q.get("review_score_desc"), now()))
+            write(c, "UPDATE apps SET reviews_status='ok' WHERE appid=?", (appid,))
         except ValueError:
-            c.execute("UPDATE apps SET reviews_status='err' WHERE appid=?", (appid,))
-        if i % 50 == 0: c.commit(); print(f"   {i}/{total}")
-    c.commit()
+            print(f"   ! reviews {appid}: HTTP {r.status_code} {r.text[:80]!r}")
+            write(c, "UPDATE apps SET reviews_status='err' WHERE appid=?", (appid,))
+        if i % 50 == 0: print(f"   {i}/{total}")
 
 # ---------------------------------------------------------------- 4) steamspy
 def stage_spy(c, limit=None):
@@ -174,25 +190,25 @@ def stage_spy(c, limit=None):
     for i, (appid,) in enumerate(rows, 1):
         r = get("https://steamspy.com/api.php", {"request": "appdetails", "appid": appid}, interval=SPY_INTERVAL)
         if r is None:
-            c.execute("UPDATE apps SET spy_status='err' WHERE appid=?", (appid,)); continue
+            write(c, "UPDATE apps SET spy_status='err' WHERE appid=?", (appid,)); continue
         try:
             d = r.json()
             tags = d.get("tags") or {}
             if isinstance(tags, list): tags = {}
-            c.execute("INSERT OR REPLACE INTO spy VALUES(?,?,?,?,?,?)",
-                      (appid, json.dumps(tags, ensure_ascii=False), d.get("owners"),
-                       d.get("average_forever"), d.get("ccu"), now()))
-            c.execute("UPDATE apps SET spy_status='ok' WHERE appid=?", (appid,))
+            write(c, "INSERT OR REPLACE INTO spy(appid,tags,owners,average_forever,ccu,fetched_at,positive,negative) VALUES(?,?,?,?,?,?,?,?)",
+                  (appid, json.dumps(tags, ensure_ascii=False), d.get("owners"),
+                   d.get("average_forever"), d.get("ccu"), now(), d.get("positive"), d.get("negative")))
+            write(c, "UPDATE apps SET spy_status='ok' WHERE appid=?", (appid,))
         except ValueError:
-            c.execute("UPDATE apps SET spy_status='err' WHERE appid=?", (appid,))
-        if i % 50 == 0: c.commit(); print(f"   {i}/{total}")
-    c.commit()
+            write(c, "UPDATE apps SET spy_status='err' WHERE appid=?", (appid,))
+        if i % 50 == 0: print(f"   {i}/{total}")
 
 # ---------------------------------------------------------------- export
 def export(c, path):
     q = """SELECT d.appid,d.name,d.short_description,d.about,d.genres,d.categories,d.developers,
                   d.publishers,d.release_date,d.is_free,d.price_cents,d.header_image,d.metacritic,
-                  r.total,r.positive,r.negative,s.tags,s.owners
+                  COALESCE(r.total, s.positive+s.negative), COALESCE(r.positive, s.positive),
+                  COALESCE(r.negative, s.negative), s.tags, s.owners
            FROM details d LEFT JOIN reviews r USING(appid) LEFT JOIN spy s USING(appid)
            WHERE d.type='game' AND d.coming_soon=0 AND length(d.short_description)>20"""
     n = 0
@@ -228,7 +244,7 @@ if __name__ == "__main__":
         if a.stage in ("all", "applist") and c.execute("SELECT COUNT(*) FROM apps").fetchone()[0] == 0:
             stage_applist(c)
         if a.stage in ("all", "details"): stage_details(c, a.limit)
-        if a.stage in ("all", "reviews"): stage_reviews(c, a.limit)
+        if a.stage == "reviews": stage_reviews(c, a.limit)   # opsiyonel; review sayıları SteamSpy'dan geliyor
         if a.stage in ("all", "spy"):     stage_spy(c, a.limit)
         status(c)
     except KeyboardInterrupt:
