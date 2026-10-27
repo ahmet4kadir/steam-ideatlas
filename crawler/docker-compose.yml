@@ -1,20 +1,37 @@
 services:
+  # 1) veri çekme (bitti; tekrar koşturursan sadece eksikleri tamamlar)
   details:
     build: .
     environment:
       - STEAM_API_KEY=${STEAM_API_KEY}
     volumes:
       - steamdata:/data
-    # applist (ilk sefer) + details; bitince durur
     command: sh -c "python steam_crawl.py --stage applist && python steam_crawl.py --stage details"
-    restart: unless-stopped
-
+    restart: "no"
 
   spy:
     build: .
     volumes:
       - steamdata:/data
-    command: sh -c "sleep 300; while true; do python steam_crawl.py --stage spy; sleep 600; done"
+    command: sh -c "python steam_crawl.py --stage spy"
+    restart: "no"
+
+  # 2) embedding + harita + kümeler + boşluklar -> /data/web  (tek seferlik, ~2-4 saat CPU)
+  pipeline:
+    build: ../pipeline
+    environment:
+      - EMBED_BACKEND=${EMBED_BACKEND:-local}
+      - EMBED_MODEL=${EMBED_MODEL:-BAAI/bge-small-en-v1.5}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    volumes:
+      - steamdata:/data
+    restart: "no"
+
+  # 3) site: three.js viewer + /data/web dosyaları  -> bu servise domain ver
+  web:
+    build: ../web
+    volumes:
+      - steamdata:/data:ro
     restart: unless-stopped
 
 volumes:

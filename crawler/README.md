@@ -1,21 +1,19 @@
-# steam-crawler (Coolify)
+# steam-ideatlas on Coolify
 
-1. Coolify → New Resource → **Docker Compose** → bu repo/klasör.
-2. Environment Variables: `STEAM_API_KEY=...`  (https://steamcommunity.com/dev/apikey)
-3. Deploy. Üç container paralel çalışır, hepsi `steamdata` volume'undaki tek `steam.db`'ye yazar.
+Tek compose, dört servis, ortak `steamdata` volume'u:
 
-İlerleme:
-    docker exec -it <details-container> python steam_crawl.py --status
+| servis   | ne yapar                                         | ne zaman        |
+|----------|--------------------------------------------------|-----------------|
+| details  | Steam store appdetails → steam.db                | bitti, restart yok |
+| spy      | SteamSpy tag + review sayıları → steam.db        | bitti, restart yok |
+| pipeline | embedding → UMAP → kümeler → boşluklar → /data/web | tek seferlik, 2-4 saat |
+| web      | nginx: viewer + /data/web                        | sürekli, domain buna |
 
-Deneme (ilk deploy'dan önce, datacenter IP'si engelli mi diye):
-    docker compose run --rm details python steam_crawl.py --stage applist
-    docker compose run --rm details python steam_crawl.py --stage details --limit 100
+Env (Coolify → Environment Variables): `STEAM_API_KEY` (crawler), isteğe bağlı `EMBED_BACKEND=openai` + `OPENAI_API_KEY`.
 
-Export (bitince):
-    docker exec -it <details-container> python steam_crawl.py --export /data/games.jsonl
-    docker cp <details-container>:/data/games.jsonl .
+Durum / export:
+    docker exec -it <spy-container> python steam_crawl.py --status
+    docker exec -it <spy-container> python steam_crawl.py --export /data/games.jsonl
 
-Notlar
-- Ctrl+C / redeploy / restart güvenli; SQLite checkpoint'ten devam eder.
-- 429 gelirse script kendisi bekler (60s → 15 dk üstel).
-- Sürekli 403 alıyorsan Steam o IP'yi engelliyor demektir → PC'de koştur.
+Pipeline'ı bir aşamadan yeniden koşturmak:
+    docker compose run --rm pipeline python run.py --force umap

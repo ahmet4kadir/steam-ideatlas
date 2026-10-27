@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ideatlas — every Steam game, mapped</title>
+<meta name="description" content="Every Steam game embedded in vector space. New ideas live in the empty space between them.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05060a; --fg:#e8eaf0; --mute:#8a90a3; --line:#1b1f2b; --panel:rgba(10,12,18,.86);
+    --orange:#ffb347; --cyan:#5ee1ff; --pink:#ff6fae; --green:#8dffb0;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #app{position:fixed;inset:0}
+  #labels{position:absolute;inset:0;pointer-events:none}
+  .label{font:600 11px/1 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#fff;
+         text-shadow:0 0 6px #000,0 0 14px #000;white-space:nowrap;transition:opacity .25s}
+  .ui{position:absolute;z-index:5;pointer-events:none}
+  .ui *{pointer-events:auto}
+  #top{top:18px;left:20px}
+  h1{margin:0;font:600 22px/1 "JetBrains Mono",monospace;letter-spacing:.14em}
+  h1 span{color:var(--orange)}
+  #stats{margin-top:8px;font:12px "JetBrains Mono",monospace;color:var(--mute);letter-spacing:.04em}
+  #stats b{color:var(--fg);font-weight:600}
+  #search{top:18px;left:50%;transform:translateX(-50%);width:min(420px,calc(100vw - 32px))}
+  #search input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+    color:var(--fg);font:14px Inter;outline:none;backdrop-filter:blur(10px)}
+  #search input:focus{border-color:#2d3447}
+  #results{margin-top:6px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:none;backdrop-filter:blur(10px)}
+  #results div{padding:8px 14px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:10px}
+  #results div:hover,#results div.act{background:#161a26}
+  #results small{color:var(--mute);font-family:"JetBrains Mono",monospace}
+  #modes{top:18px;right:20px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .btn{padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg);
+       font:500 12px Inter;cursor:pointer;backdrop-filter:blur(10px);letter-spacing:.02em}
+  .btn:hover{border-color:#2d3447}
+  .btn.on{border-color:var(--orange);color:var(--orange)}
+  #panel{right:20px;top:68px;width:min(360px,calc(100vw - 40px));max-height:calc(100vh - 100px);overflow:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;backdrop-filter:blur(14px);display:none}
+  #panel img{width:100%;border-radius:8px;display:block;margin-bottom:12px;background:#0d1017}
+  #panel h2{margin:0 0 6px;font:600 18px/1.25 Inter}
+  #panel .kicker{font:600 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:6px}
+  #panel p{margin:0 0 10px;font-size:13px;line-height:1.5;color:#c9cdd8}
+  .tags{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 12px}
+  .tag{font:11px "JetBrains Mono",monospace;padding:3px 7px;border-radius:5px;border:1px solid var(--line);color:var(--cyan)}
+  .row{display:flex;justify-content:space-between;font:12px "JetBrains Mono",monospace;color:var(--mute);padding:5px 0;border-top:1px solid var(--line)}
+  .row b{color:var(--fg);font-weight:500}
+  .bar{height:4px;background:#1b1f2b;border-radius:2px;margin:6px 0 2px;position:relative}
+  .bar i{position:absolute;left:0;top:0;bottom:0;background:var(--orange);border-radius:2px}
+  .bar u{position:absolute;top:-3px;width:10px;height:10px;border-radius:50%;background:var(--orange);margin-left:-5px;box-shadow:0 0 8px var(--orange)}
+  .big{font:600 26px "JetBrains Mono",monospace;color:var(--orange);margin-top:8px}
+  .big small{font:12px Inter;color:var(--mute);margin-left:6px}
+  .link{color:var(--cyan);text-decoration:none;font-size:12px}
+  .link:hover{text-decoration:underline}
+  .x{position:absolute;right:10px;top:8px;background:none;border:0;color:var(--mute);font-size:18px;cursor:pointer}
+  #tip{position:absolute;z-index:6;pointer-events:none;padding:5px 9px;border-radius:6px;background:rgba(0,0,0,.75);
+       font:12px Inter;color:#fff;display:none;white-space:nowrap;border:1px solid var(--line)}
+  #hint{bottom:16px;left:20px;font:11px "JetBrains Mono",monospace;color:var(--mute);letter-spacing:.04em}
+  #credit{bottom:16px;right:20px;font:11px "JetBrains Mono",monospace;color:var(--mute)}
+  #credit a{color:var(--mute)}
+  #load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:20;font:13px "JetBrains Mono",monospace;color:var(--mute);letter-spacing:.1em}
+  #load b{display:block;color:var(--orange);font-size:22px;margin-bottom:12px;letter-spacing:.2em}
+  .list div{padding:7px 0;border-top:1px solid var(--line);font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+  .list div:hover{color:var(--orange)}
+  .list small{color:var(--mute);font:11px "JetBrains Mono",monospace;white-space:nowrap}
+  .hole-ring{width:14px;height:14px;border:1.5px dashed var(--cyan);border-radius:50%;opacity:.9}
+  @media (max-width:640px){#top{left:14px;top:12px} h1{font-size:16px} #stats{display:none} #search{top:46px} #modes{top:12px;right:14px} #panel{top:92px;right:14px;left:14px;width:auto} #hint{display:none}}
+</style>
+</head>
+<body>
+<div id="load"><div><b>IDEATLAS</b>loading the universe…</div></div>
+<div id="app"><div id="labels"></div></div>
+<div id="tip"></div>
+
+<div class="ui" id="top">
+  <h1>IDE<span>ATLAS</span></h1>
+  <div id="stats">—</div>
+</div>
+<div class="ui" id="search">
+  <input id="q" placeholder="Search a game… (press / to focus)" autocomplete="off">
+  <div id="results"></div>
+</div>
+<div class="ui" id="modes">
+  <button class="btn" id="bClusters">Clusters</button>
+  <button class="btn" id="bHoles">Empty space</button>
+  <button class="btn" id="bLoners">Loners</button>
+  <button class="btn" id="bAbout">?</button>
+</div>
+<div class="ui" id="panel"></div>
+<div class="ui" id="hint">drag · orbit &nbsp; scroll · zoom &nbsp; click · game &nbsp; esc · close</div>
+<div class="ui" id="credit"><a href="https://ahmetkadir.com">ahmetkadir.com</a> · data: Steam &amp; SteamSpy</div>
+
+<script type="importmap">
+{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+const DATA = './data/';
+const SCALE = 60;
+const $ = s => document.querySelector(s);
+const fmt = n => n.toLocaleString('en-US');
+
+// ---------------------------------------------------------------- data
+async function bin(name, T){ const b = await (await fetch(DATA+name)).arrayBuffer(); return new T(b); }
+const [pos16, clusterId, size8, lonely8, names, clusters, holes, stats] = await Promise.all([
+  bin('pos.bin', Int16Array), bin('cluster.bin', Uint16Array), bin('size.bin', Uint8Array), bin('lonely.bin', Uint8Array),
+  fetch(DATA+'names.json').then(r=>r.json()), fetch(DATA+'clusters.json').then(r=>r.json()),
+  fetch(DATA+'holes.json').then(r=>r.json()), fetch(DATA+'stats.json').then(r=>r.json())
+]);
+const N = names.length;
+const appidToIdx = new Map(); names.forEach((g,i)=>appidToIdx.set(g[0], i));
+
+// ---------------------------------------------------------------- scene
+const app = $('#app');
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+app.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05060a);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.1, 2000);
+camera.position.set(0, 20, 150);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.06; controls.autoRotate = true; controls.autoRotateSpeed = 0.25;
+controls.minDistance = 3; controls.maxDistance = 400;
+renderer.domElement.addEventListener('pointerdown', ()=>controls.autoRotate=false, {once:true});
+
+const labelRenderer = new CSS2DRenderer({ element: $('#labels') });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+// points
+const positions = new Float32Array(N*3); const colors = new Float32Array(N*3); const sizes = new Float32Array(N); const idxAttr = new Float32Array(N);
+const clusterColor = clusters.map(c => new THREE.Color().setHSL(c.hue/360, 0.85, 0.62));
+const tmp = new THREE.Color();
+for (let i=0;i<N;i++){
+  positions[i*3] = pos16[i*3]/32767*SCALE; positions[i*3+1] = pos16[i*3+1]/32767*SCALE; positions[i*3+2] = pos16[i*3+2]/32767*SCALE;
+  tmp.copy(clusterColor[clusterId[i]] || clusterColor[0]); tmp.offsetHSL((Math.random()-0.5)*0.04, 0, (Math.random()-0.5)*0.12);
+  colors[i*3]=tmp.r; colors[i*3+1]=tmp.g; colors[i*3+2]=tmp.b;
+  sizes[i] = 0.35 + (size8[i]/255)*2.2; idxAttr[i] = i;
+}
+const geo = new THREE.BufferGeometry();
+geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+geo.setAttribute('aIndex', new THREE.BufferAttribute(idxAttr, 1));
+const mat = new THREE.ShaderMaterial({
+  uniforms: { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0} },
+  vertexShader: `
+    attribute float aSize; attribute float aIndex; varying vec3 vC; varying float vA; uniform float uScale, uSel, uDim;
+    void main(){
+      vec4 mv = modelViewMatrix * vec4(position,1.0);
+      float sel = (abs(aIndex - uSel) < 0.5) ? 1.0 : 0.0;
+      float s = aSize * (1.0 + sel*3.0);
+      gl_PointSize = clamp(s * uScale / -mv.z, 1.0, 22.0);
+      vC = mix(color, vec3(1.0,0.75,0.3), sel);
+      vA = mix(1.0, 0.12, uDim) * (0.34 + sel*0.66);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying vec3 vC; varying float vA;
+    void main(){
+      vec2 d = gl_PointCoord - 0.5; float r = length(d)*2.0;
+      if (r > 1.0) discard;
+      float a = pow(1.0 - r, 1.8);
+      gl_FragColor = vec4(vC * (0.5 + 0.7*a), a * vA);
+    }`,
+  vertexColors:true, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending
+});
+const points = new THREE.Points(geo, mat); scene.add(points);
+
+// post
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.7, 0.15);
+composer.addPass(bloom); composer.addPass(new OutputPass());
+
+// cluster labels
+const labelObjs = [];
+const topClusters = [...clusters].sort((a,b)=>b.n-a.n).slice(0, 60);
+for (const c of topClusters){
+  const el = document.createElement('div'); el.className='label'; el.textContent = c.label;
+  el.style.color = '#'+clusterColor[c.id].clone().offsetHSL(0,0,0.15).getHexString();
+  const o = new CSS2DObject(el); o.position.set(c.center[0]*SCALE, c.center[1]*SCALE, c.center[2]*SCALE);
+  o.userData = c; scene.add(o); labelObjs.push(o);
+}
+let showLabels = true;
+
+// hole markers
+const holeGroup = new THREE.Group(); scene.add(holeGroup); holeGroup.visible = false;
+for (const h of holes){
+  const r = Math.max(h.radius*SCALE, 0.6);
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12),
+    new THREE.MeshBasicMaterial({ color:0x5ee1ff, wireframe:true, transparent:true, opacity:0.35 }));
+  m.position.set(h.pos[0]*SCALE, h.pos[1]*SCALE, h.pos[2]*SCALE); m.userData = h; holeGroup.add(m);
+  const el = document.createElement('div'); el.className='label'; el.style.color='#5ee1ff'; el.textContent = 'gap ×'+h.gap;
+  const o = new CSS2DObject(el); o.position.set(0, r+0.4, 0); m.add(o);
+}
+
+// ---------------------------------------------------------------- interaction
+const ray = new THREE.Raycaster(); ray.params.Points.threshold = 0.6;
+const mouse = new THREE.Vector2(); let hover = -1, selected = -1, lastPick = 0, downAt = null;
+const tip = $('#tip');
+renderer.domElement.addEventListener('pointermove', e => {
+  mouse.set((e.clientX/innerWidth)*2-1, -(e.clientY/innerHeight)*2+1);
+  const now = performance.now(); if (now - lastPick < 40) return; lastPick = now;
+  ray.setFromCamera(mouse, camera);
+  ray.params.Points.threshold = Math.max(0.25, camera.position.distanceTo(controls.target)/180);
+  const hit = ray.intersectObject(points, false);
+  if (hit.length){
+    hit.sort((a,b)=>a.distanceToRay - b.distanceToRay); hover = hit[0].index;
+    tip.style.display='block'; tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+14)+'px';
+    tip.textContent = names[hover][1]; renderer.domElement.style.cursor='pointer';
+  } else { hover=-1; tip.style.display='none'; renderer.domElement.style.cursor=''; }
+});
+renderer.domElement.addEventListener('pointerdown', e => downAt=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX-downAt[0], e.clientY-downAt[1]) > 4) return;
+  if (holeGroup.visible){
+    ray.setFromCamera(mouse, camera); const hh = ray.intersectObjects(holeGroup.children, false);
+    if (hh.length){ showHole(hh[0].object.userData); return; }
+  }
+  if (hover >= 0) selectGame(hover);
+});
+addEventListener('keydown', e => {
+  if (e.key==='Escape'){ closePanel(); $('#q').blur(); }
+  if (e.key==='/' && document.activeElement!==$('#q')){ e.preventDefault(); $('#q').focus(); }
+});
+
+// fly-to
+let fly = null;
+function flyTo(target, dist=9){
+  const t = new THREE.Vector3(...target);
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  fly = { t0: performance.now(), dur: 1400, p0: camera.position.clone(), c0: controls.target.clone(),
+          p1: t.clone().add(dir.multiplyScalar(dist)), c1: t };
+  controls.autoRotate = false;
+}
+function stepFly(){
+  if (!fly) return; const k = Math.min(1, (performance.now()-fly.t0)/fly.dur); const e = 1-Math.pow(1-k,3);
+  camera.position.lerpVectors(fly.p0, fly.p1, e); controls.target.lerpVectors(fly.c0, fly.c1, e);
+  if (k>=1) fly=null;
+}
+
+// ---------------------------------------------------------------- panel
+const panel = $('#panel');
+function openPanel(html){ panel.innerHTML = `<button class="x" id="px">×</button>`+html; panel.style.display='block'; $('#px').onclick=closePanel; }
+function closePanel(){ panel.style.display='none'; selected=-1; mat.uniforms.uSel.value=-1; }
+const chunkCache = new Map();
+async function gameDetail(appid){
+  const k = appid % 1024;
+  if (!chunkCache.has(k)) chunkCache.set(k, fetch(DATA+'games/'+k+'.json').then(r=>r.json()));
+  return (await chunkCache.get(k))[appid];
+}
+async function selectGame(i, doFly=true){
+  selected = i; mat.uniforms.uSel.value = i;
+  const appid = names[i][0];
+  if (doFly) flyTo([positions[i*3], positions[i*3+1], positions[i*3+2]]);
+  const g = await gameDetail(appid); if (!g) return;
+  const c = clusters[g.cluster];
+  openPanel(`
+    <img src="${g.img}" alt="" loading="lazy" onerror="this.style.display='none'">
+    <div class="kicker">${c ? c.label : ''}</div>
+    <h2>${esc(g.name)}</h2>
+    <p>${esc(g.short)}</p>
+    <div class="tags">${g.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <div class="row"><span>reviews</span><b>${fmt(g.reviews)}${g.reviews? ' · '+Math.round(g.positive/g.reviews*100)+'% positive':''}</b></div>
+    <div class="row"><span>released</span><b>${esc(g.release||'—')}</b></div>
+    <div class="row"><span>price</span><b>${g.free?'free':'$'+g.price.toFixed(2)}</b></div>
+    <div class="row"><span>closest twin</span><b><a class="link" href="#" id="twin">${esc(g.twin.name)}</a></b></div>
+    <div class="bar"><i style="width:${g.twin.sim*100}%"></i><u style="left:${g.twin.sim*100}%"></u></div>
+    <div class="row" style="border:0;padding-top:2px"><span>similarity ${g.twin.sim.toFixed(2)}</span><span>same game →</span></div>
+    <div class="big">${g.twin_pct.toFixed(1)}%<small>of Steam games have a closer twin</small></div>
+    <div class="row" style="margin-top:10px"><a class="link" href="https://store.steampowered.com/app/${appid}" target="_blank" rel="noopener">open on Steam ↗</a>
+      <a class="link" href="#" id="toCluster">fly to cluster</a></div>`);
+  $('#twin').onclick = e => { e.preventDefault(); const j = appidToIdx.get(g.twin.appid); if (j!==undefined) selectGame(j); };
+  $('#toCluster').onclick = e => { e.preventDefault(); if (c) flyTo(c.center.map(v=>v*SCALE), 30); };
+}
+function showHole(h){
+  flyTo(h.pos.map(v=>v*SCALE), Math.max(6, h.radius*SCALE*4));
+  openPanel(`
+    <div class="kicker" style="color:var(--cyan)">empty space · gap ×${h.gap}</div>
+    <h2>Nothing lives here</h2>
+    <p>Games on every side, nothing in the middle. The nearest neighbour is ${h.gap}× farther than a typical game's. Whatever sits between these would be new.</p>
+    <div class="tags">${h.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <div class="kicker">surrounding games</div>
+    <div class="list">${h.neighbors.map(n=>`<div data-i="${appidToIdx.get(n.appid)}"><span>${esc(n.name)}</span><small>${esc((clusters[n.cluster]||{}).label||'')}</small></div>`).join('')}</div>`);
+  panel.querySelectorAll('.list div').forEach(d => d.onclick = () => selectGame(+d.dataset.i));
+}
+function showLoners(){
+  openPanel(`<div class="kicker">the loners</div><h2>Games unlike anything else</h2>
+    <p>Lowest similarity to their closest neighbour across all ${fmt(N)} games.</p>
+    <div class="list">${stats.loners.map(l=>`<div data-i="${appidToIdx.get(l.appid)}"><span>${esc(l.name)}</span><small>${l.sim.toFixed(2)}</small></div>`).join('')}</div>`);
+  panel.querySelectorAll('.list div').forEach(d => d.onclick = () => selectGame(+d.dataset.i));
+}
+function showClusters(){
+  openPanel(`<div class="kicker">population</div><h2>Where the players are</h2>
+    <p>Clusters ranked by total reviews.</p>
+    <div class="list">${stats.top_clusters.map(c=>`<div data-c="${c.id}"><span>${esc(c.label)}</span><small>${fmt(c.reviews)} reviews · ${fmt(c.n)} games</small></div>`).join('')}</div>`);
+  panel.querySelectorAll('.list div').forEach(d => d.onclick = () => { const c = clusters[+d.dataset.c]; flyTo(c.center.map(v=>v*SCALE), 30); });
+}
+function showAbout(){
+  openPanel(`<div class="kicker">about</div><h2>Ideatlas</h2>
+    <p>${fmt(stats.games)} Steam games, each turned into a vector by a text-embedding model from its description and tags, then projected to 3D with UMAP. Nearby points are similar games; colour is the cluster; brightness is review count.</p>
+    <p><b style="color:var(--cyan)">Empty space</b> marks regions surrounded by games with nothing inside — where a game idea unlike existing ones would sit. <b style="color:var(--orange)">Loners</b> are the games farthest from any neighbour.</p>
+    <p>Built ${stats.built} · data from the Steam store API and SteamSpy · by <a class="link" href="https://ahmetkadir.com">Ahmet Kadir Doğan</a></p>`);
+}
+function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// modes
+let holesOn = false;
+$('#bHoles').onclick = () => { holesOn=!holesOn; holeGroup.visible=holesOn; mat.uniforms.uDim.value = holesOn?1:0;
+  $('#bHoles').classList.toggle('on', holesOn); if (holesOn && holes.length) showHole(holes[0]); else closePanel(); };
+$('#bLoners').onclick = showLoners; $('#bClusters').onclick = showClusters; $('#bAbout').onclick = showAbout;
+
+// search
+const q = $('#q'), res = $('#results'); let hits = [], act = 0, deb;
+const lower = names.map(g => g[1].toLowerCase());
+q.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(doSearch, 80); });
+q.addEventListener('keydown', e => {
+  if (e.key==='ArrowDown'){ act=Math.min(hits.length-1, act+1); renderHits(); e.preventDefault(); }
+  if (e.key==='ArrowUp'){ act=Math.max(0, act-1); renderHits(); e.preventDefault(); }
+  if (e.key==='Enter' && hits[act]!==undefined){ pick(hits[act]); }
+});
+q.addEventListener('blur', () => setTimeout(()=>res.style.display='none', 150));
+q.addEventListener('focus', () => { if (hits.length) res.style.display='block'; });
+function doSearch(){
+  const s = q.value.trim().toLowerCase(); hits=[]; act=0;
+  if (s.length < 2){ res.style.display='none'; return; }
+  const starts=[], incl=[];
+  for (let i=0;i<N && (starts.length<8);i++){
+    const n = lower[i]; if (n.startsWith(s)) starts.push(i); else if (incl.length<8 && n.includes(s)) incl.push(i);
+  }
+  hits = starts.concat(incl).slice(0,8); renderHits();
+}
+function renderHits(){
+  res.style.display = hits.length?'block':'none';
+  res.innerHTML = hits.map((i,k)=>`<div class="${k===act?'act':''}" data-i="${i}"><span>${esc(names[i][1])}</span><small>${esc((clusters[clusterId[i]]||{}).label||'')}</small></div>`).join('');
+  res.querySelectorAll('div').forEach(d => d.onmousedown = () => pick(+d.dataset.i));
+}
+function pick(i){ res.style.display='none'; q.value = names[i][1]; selectGame(i); }
+
+// deep link ?app=413150
+const urlApp = new URLSearchParams(location.search).get('app');
+if (urlApp && appidToIdx.has(+urlApp)) setTimeout(()=>selectGame(appidToIdx.get(+urlApp)), 600);
+
+// ---------------------------------------------------------------- loop
+$('#stats').innerHTML = `<b>${fmt(stats.games)}</b> games · <b>${stats.clusters}</b> clusters · <b>${stats.holes}</b> holes · <b>${fmt(stats.reviews_total)}</b> reviews`;
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
+  mat.uniforms.uScale.value = innerHeight/2;
+});
+const camPos = new THREE.Vector3();
+function animate(){
+  requestAnimationFrame(animate);
+  stepFly(); controls.update();
+  const d = camera.position.distanceTo(controls.target);
+  for (const o of labelObjs){
+    const dd = o.position.distanceTo(camera.position);
+    const fade = holesOn ? 0.25 : THREE.MathUtils.clamp((d-4)/40, 0, 1) * THREE.MathUtils.clamp(1 - (dd-30)/220, 0.15, 1);
+    o.element.style.opacity = showLabels ? fade : 0;
+  }
+  composer.render(); labelRenderer.render(scene, camera);
+}
+$('#load').remove();
+animate();
+</script>
+</body>
+</html>

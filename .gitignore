@@ -4,3 +4,5 @@
 *.jsonl
 __pycache__/
 .env
+node_modules/
+web/data/
