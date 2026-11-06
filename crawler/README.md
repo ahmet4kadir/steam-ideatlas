@@ -17,3 +17,7 @@ Durum / export:
 
 Pipeline'ı bir aşamadan yeniden koşturmak:
     docker compose run --rm pipeline python run.py --force umap
+
+## api (fikir üretme)
+Env: `ANTHROPIC_API_KEY` (zorunlu), `ANTHROPIC_MODEL` (varsayılan `claude-sonnet-5-5`), `MAX_DRAFTS=3`, `PER_IP_PER_HOUR=6`, `DAILY_CAP=300`.
+Fikirler `/data/ideas/ideas.jsonl`'a yazılır; `GET /api/ideas` galeri, `GET /api/health` durum.

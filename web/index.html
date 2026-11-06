@@ -68,6 +68,34 @@
   .list div:hover{color:var(--orange)}
   .list small{color:var(--mute);font:11px "JetBrains Mono",monospace;white-space:nowrap}
   .hole-ring{width:14px;height:14px;border:1.5px dashed var(--cyan);border-radius:50%;opacity:.9}
+  #mix{top:68px;left:50%;transform:translateX(-50%);width:min(560px,calc(100vw - 32px));display:none;
+       background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(10px)}
+  #mix .kicker{font:600 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--pink);margin-bottom:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:30px}
+  .chip{display:flex;align-items:center;gap:6px;padding:5px 9px;border-radius:8px;border:1px solid var(--line);font-size:12px;background:#0d1017}
+  .chip i{display:inline-block;width:8px;height:8px;border-radius:50%}
+  .chip b{cursor:pointer;color:var(--mute);font-weight:400}
+  .chip.empty{border-style:dashed;color:var(--mute)}
+  .mixbtn{margin-left:auto;padding:7px 12px;border-radius:8px;border:1px solid var(--pink);background:transparent;color:var(--pink);font:600 12px Inter;cursor:pointer}
+  .mixbtn:disabled{opacity:.35;cursor:default}
+  .draft{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;animation:in .4s ease}
+  .draft.accepted{border-color:var(--green)} .draft.rej{opacity:.75}
+  .draft h3{margin:0 0 4px;font:600 14px Inter}
+  .draft p{font-size:12px!important;margin:0 0 6px!important}
+  .draft .meta{display:flex;justify-content:space-between;font:11px "JetBrains Mono",monospace;color:var(--mute);margin-top:4px}
+  .badge{font:600 10px "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px}
+  .badge.rej{color:var(--pink);border:1px solid var(--pink)} .badge.ok{color:var(--green);border:1px solid var(--green)} .badge.wait{color:var(--mute);border:1px solid var(--line)}
+  .bar.p i{background:var(--pink)} .bar.p u{background:var(--pink);box-shadow:0 0 8px var(--pink)}
+  .bar.g i{background:var(--green)} .bar.g u{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .thinking{display:flex;gap:4px;align-items:center;font:11px "JetBrains Mono",monospace;color:var(--mute);padding:8px 0}
+  .thinking i{width:5px;height:5px;border-radius:50%;background:var(--pink);animation:blink 1.2s infinite}
+  .thinking i:nth-child(2){animation-delay:.2s} .thinking i:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+  @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .idea-label{font:600 12px "JetBrains Mono",monospace;letter-spacing:.06em;color:#fff;text-shadow:0 0 8px var(--orange),0 0 16px #000;white-space:nowrap;
+              padding:3px 8px;border:1px solid rgba(255,179,71,.6);border-radius:6px;background:rgba(10,12,18,.7);transition:opacity .25s}
+  .mech{margin:0 0 10px;padding-left:16px;font-size:12px;color:#c9cdd8;line-height:1.5}
+  @media (max-width:640px){#mix{top:92px}}
   @media (max-width:640px){#top{left:14px;top:12px} h1{font-size:16px} #stats{display:none} #search{top:46px} #modes{top:12px;right:14px} #panel{top:92px;right:14px;left:14px;width:auto} #hint{display:none}}
 </style>
 </head>
@@ -85,13 +113,19 @@
   <div id="results"></div>
 </div>
 <div class="ui" id="modes">
+  <button class="btn" id="bMix" style="border-color:var(--pink);color:var(--pink)">Mix</button>
+  <button class="btn" id="bIdeas">Ideas</button>
   <button class="btn" id="bClusters">Clusters</button>
   <button class="btn" id="bHoles">Empty space</button>
   <button class="btn" id="bLoners">Loners</button>
   <button class="btn" id="bAbout">?</button>
 </div>
+<div class="ui" id="mix">
+  <div class="kicker">mix · pick 2–3 games, then ask what lives between them</div>
+  <div class="chips" id="chips"></div>
+</div>
 <div class="ui" id="panel"></div>
-<div class="ui" id="hint">drag · orbit &nbsp; scroll · zoom &nbsp; click · game &nbsp; esc · close</div>
+<div class="ui" id="hint">drag · orbit &nbsp; scroll · zoom &nbsp; click · game &nbsp; mix · pick 2-3 games &nbsp; esc · close</div>
 <div class="ui" id="credit"><a href="https://ahmetkadir.com">ahmetkadir.com</a> · data: Steam &amp; SteamSpy</div>
 
 <script type="importmap">
@@ -229,7 +263,7 @@ renderer.domElement.addEventListener('pointerup', e => {
     ray.setFromCamera(mouse, camera); const hh = ray.intersectObjects(holeGroup.children, false);
     if (hh.length){ showHole(hh[0].object.userData); return; }
   }
-  if (hover >= 0) selectGame(hover);
+  if (hover >= 0){ if (mixOn) addToMix(hover); else selectGame(hover); }
 });
 addEventListener('keydown', e => {
   if (e.key==='Escape'){ closePanel(); $('#q').blur(); }
@@ -281,7 +315,9 @@ async function selectGame(i, doFly=true){
     <div class="row" style="border:0;padding-top:2px"><span>similarity ${g.twin.sim.toFixed(2)}</span><span>same game →</span></div>
     <div class="big">${g.twin_pct.toFixed(1)}%<small>of Steam games have a closer twin</small></div>
     <div class="row" style="margin-top:10px"><a class="link" href="https://store.steampowered.com/app/${appid}" target="_blank" rel="noopener">open on Steam ↗</a>
-      <a class="link" href="#" id="toCluster">fly to cluster</a></div>`);
+      <a class="link" href="#" id="toCluster">fly to cluster</a>
+      <a class="link" href="#" id="toMix" style="color:var(--pink)">+ mix</a></div>`);
+  $('#toMix').onclick = e => { e.preventDefault(); if (!mixOn) toggleMix(true); addToMix(i); };
   $('#twin').onclick = e => { e.preventDefault(); const j = appidToIdx.get(g.twin.appid); if (j!==undefined) selectGame(j); };
   $('#toCluster').onclick = e => { e.preventDefault(); if (c) flyTo(c.center.map(v=>v*SCALE), 30); };
 }
@@ -292,9 +328,11 @@ function showHole(h){
     <h2>Nothing lives here</h2>
     <p>Games on every side, nothing in the middle. The nearest neighbour is ${h.gap}× farther than a typical game's. Whatever sits between these would be new.</p>
     <div class="tags">${h.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    <button class="mixbtn" id="genHole" style="margin:0 0 12px;width:100%">✦ Design the game that lives here</button>
     <div class="kicker">surrounding games</div>
     <div class="list">${h.neighbors.map(n=>`<div data-i="${appidToIdx.get(n.appid)}"><span>${esc(n.name)}</span><small>${esc((clusters[n.cluster]||{}).label||'')}</small></div>`).join('')}</div>`);
   panel.querySelectorAll('.list div').forEach(d => d.onclick = () => selectGame(+d.dataset.i));
+  $('#genHole').onclick = () => runIdea({ mode:'hole', hole_id:h.id });
 }
 function showLoners(){
   openPanel(`<div class="kicker">the loners</div><h2>Games unlike anything else</h2>
@@ -312,6 +350,7 @@ function showAbout(){
   openPanel(`<div class="kicker">about</div><h2>Ideatlas</h2>
     <p>${fmt(stats.games)} Steam games, each turned into a vector by a text-embedding model from its description and tags, then projected to 3D with UMAP. Nearby points are similar games; colour is the cluster; brightness is review count.</p>
     <p><b style="color:var(--cyan)">Empty space</b> marks regions surrounded by games with nothing inside — where a game idea unlike existing ones would sit. <b style="color:var(--orange)">Loners</b> are the games farthest from any neighbour.</p>
+    <p><b style="color:var(--pink)">Mix</b> picks 2–3 games and asks a language model for the game between them. Each draft is embedded with the same model that built the map and measured against every Steam game; if it lands too close to something that exists, the model is told what, and rewrites. The result becomes a new star on the map.</p>
     <p>Built ${stats.built} · data from the Steam store API and SteamSpy · by <a class="link" href="https://ahmetkadir.com">Ahmet Kadir Doğan</a></p>`);
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -347,11 +386,206 @@ function renderHits(){
   res.innerHTML = hits.map((i,k)=>`<div class="${k===act?'act':''}" data-i="${i}"><span>${esc(names[i][1])}</span><small>${esc((clusters[clusterId[i]]||{}).label||'')}</small></div>`).join('');
   res.querySelectorAll('div').forEach(d => d.onmousedown = () => pick(+d.dataset.i));
 }
-function pick(i){ res.style.display='none'; q.value = names[i][1]; selectGame(i); }
+function pick(i){ res.style.display='none'; q.value=''; if (mixOn) addToMix(i); else selectGame(i); }
 
 // deep link ?app=413150
 const urlApp = new URLSearchParams(location.search).get('app');
 if (urlApp && appidToIdx.has(+urlApp)) setTimeout(()=>selectGame(appidToIdx.get(+urlApp)), 600);
+
+
+// ---------------------------------------------------------------- mix / ideas
+let mixOn = false; const mixSel = [];
+function toggleMix(force){
+  mixOn = force===undefined ? !mixOn : force;
+  $('#bMix').classList.toggle('on', mixOn); $('#mix').style.display = mixOn ? 'block' : 'none';
+  $('#q').placeholder = mixOn ? 'Add a game to the mix…' : 'Search a game… (press / to focus)';
+  if (mixOn){ closePanel(); renderChips(); $('#q').focus(); }
+}
+function addToMix(i){ if (mixSel.includes(i) || mixSel.length>=3) return; mixSel.push(i); mat.uniforms.uSel.value=i; renderChips(); }
+function renderChips(){
+  const c = $('#chips');
+  c.innerHTML = mixSel.map((i,k)=>`<span class="chip"><i style="background:#${clusterColor[clusterId[i]].getHexString()}"></i>${esc(names[i][1])}<b data-k="${k}">×</b></span>`).join('')
+    + (mixSel.length<3 ? `<span class="chip empty">${mixSel.length<2?'+ pick a game':'+ one more (optional)'}</span>` : '')
+    + `<button class="mixbtn" id="goMix" ${mixSel.length<2?'disabled':''}>✦ What lives between these?</button>`;
+  c.querySelectorAll('.chip b').forEach(b => b.onclick = () => { mixSel.splice(+b.dataset.k,1); renderChips(); });
+  $('#goMix').onclick = () => runIdea({ mode:'blend', appids: mixSel.map(i=>names[i][0]) });
+}
+$('#bMix').onclick = () => toggleMix();
+
+// glow sprite texture
+const glowTex = (() => { const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  const r=g.createRadialGradient(64,64,0,64,64,64); r.addColorStop(0,'rgba(255,255,255,1)'); r.addColorStop(0.25,'rgba(255,255,255,.55)'); r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=r; g.fillRect(0,0,128,128); const t=new THREE.CanvasTexture(c); return t; })();
+
+// particle streams: sources -> target
+const PN = 1800;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(PN*3), pCol = new Float32Array(PN*3), pSize = new Float32Array(PN), pIdx = new Float32Array(PN);
+for (let i=0;i<PN;i++){ pSize[i]=0.9+Math.random()*1.4; pIdx[i]=-1; }
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3)); pGeo.setAttribute('color', new THREE.BufferAttribute(pCol,3));
+pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSize,1)); pGeo.setAttribute('aIndex', new THREE.BufferAttribute(pIdx,1));
+const pMat = mat.clone(); pMat.uniforms = { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0} };
+const particles = new THREE.Points(pGeo, pMat); particles.visible=false; particles.frustumCulled=false; scene.add(particles);
+const P = { on:false, srcs:[], target:new THREE.Vector3(), t:new Float32Array(PN), side:[], speed:new Float32Array(PN), core:null, ring:null, t0:0 };
+for (let i=0;i<PN;i++){ P.t[i]=Math.random(); P.speed[i]=0.25+Math.random()*0.35; P.side.push(new THREE.Vector3().randomDirection().multiplyScalar(0.6+Math.random()*2.2)); }
+const core = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xff6fae, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, opacity:0 }));
+core.scale.setScalar(3); scene.add(core); P.core = core;
+function startParticles(sources, target){
+  P.srcs = sources.map(p=>new THREE.Vector3(p[0]*SCALE,p[1]*SCALE,p[2]*SCALE)); P.target.set(target[0]*SCALE,target[1]*SCALE,target[2]*SCALE);
+  for (let i=0;i<PN;i++){ const s=i%P.srcs.length; const col=P.srcs.length===sources.length ? sourceColor(s) : new THREE.Color(1,1,1); pCol[i*3]=col.r; pCol[i*3+1]=col.g; pCol[i*3+2]=col.b; }
+  pGeo.attributes.color.needsUpdate=true; particles.visible=true; P.on=true; P.t0=performance.now(); core.position.copy(P.target);
+}
+let srcColors = [];
+function sourceColor(k){ return srcColors[k] || new THREE.Color(0xffffff); }
+function stopParticles(){ P.on=false; particles.visible=false; core.material.opacity=0; }
+const _a=new THREE.Vector3(), _b=new THREE.Vector3();
+function stepParticles(dt){
+  if (!P.on) return;
+  const age = (performance.now()-P.t0)/1000; const ramp = Math.min(1, age/1.2);
+  for (let i=0;i<PN;i++){
+    const s = P.srcs[i%P.srcs.length]; let t = P.t[i] + dt*P.speed[i]; if (t>1) t-=1; P.t[i]=t;
+    const e = t*t*(3-2*t);
+    _a.lerpVectors(s, P.target, e); const bulge = Math.sin(Math.PI*t);
+    _b.copy(P.side[i]).multiplyScalar(bulge*(1-e*0.3)); _a.add(_b);
+    _a.addScaledVector(P.side[(i*7)%PN], Math.sin(age*3+i)*0.05*bulge);
+    pPos[i*3]=_a.x; pPos[i*3+1]=_a.y; pPos[i*3+2]=_a.z;
+    pSize[i] = (0.6 + 1.2*(1-e)) * ramp;
+  }
+  pGeo.attributes.position.needsUpdate=true; pGeo.attributes.aSize.needsUpdate=true;
+  core.material.opacity = 0.55*ramp + 0.25*Math.sin(age*4)*ramp; core.scale.setScalar(2.6 + 0.8*Math.sin(age*4));
+}
+
+// probe line: target -> closest existing game
+const probeGeo = new THREE.BufferGeometry().setFromPoints(Array.from({length:64},()=>new THREE.Vector3()));
+const probe = new THREE.Line(probeGeo, new THREE.LineBasicMaterial({ color:0xff6fae, transparent:true, opacity:0.9 })); probe.visible=false; scene.add(probe);
+const probeDot = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xff6fae, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false })); probeDot.scale.setScalar(1.6); probeDot.visible=false; scene.add(probeDot);
+let probeAnim = null;
+function fireProbe(from, to, ok){
+  const a=new THREE.Vector3(...from.map(v=>v*SCALE)), b=new THREE.Vector3(...to.map(v=>v*SCALE));
+  const arr = probeGeo.attributes.position.array; for (let i=0;i<64;i++){ const k=i/63; arr[i*3]=a.x+(b.x-a.x)*k; arr[i*3+1]=a.y+(b.y-a.y)*k; arr[i*3+2]=a.z+(b.z-a.z)*k; }
+  probeGeo.attributes.position.needsUpdate=true; probe.material.color.set(ok?0x8dffb0:0xff6fae); probeDot.material.color.set(ok?0x8dffb0:0xff6fae);
+  probe.visible=true; probeDot.visible=true; probeDot.position.copy(a); probeAnim={ t0:performance.now(), a, b, ok };
+}
+function stepProbe(){
+  if (!probeAnim) return; const k = (performance.now()-probeAnim.t0)/1000;
+  let f; if (k<0.8) f=k/0.8; else if (k<2.2) f=1; else if (k<2.8) f=1-(k-2.2)/0.6; else { probe.visible=false; probeDot.visible=false; probeAnim=null; return; }
+  const n = Math.max(2, Math.round(f*64)); probeGeo.setDrawRange(0, n);
+  probeDot.position.lerpVectors(probeAnim.a, probeAnim.b, Math.min(1,f)); probe.material.opacity = k>2.2 ? f : 0.9;
+}
+
+// idea stars
+const ideaGroup = new THREE.Group(); scene.add(ideaGroup); const ideaObjs = new Map();
+function spawnIdea(rec, burst=false){
+  if (ideaObjs.has(rec.id)) return ideaObjs.get(rec.id);
+  const pos = (rec.final ? rec.final.pos : rec.pos).map(v=>v*SCALE);
+  const g = new THREE.Group(); g.position.set(...pos); g.userData={ idea:rec, born:performance.now(), burst };
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xffb347, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+  sp.scale.setScalar(burst?0.1:2.2); g.add(sp);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.7,0.78,48), new THREE.MeshBasicMaterial({ color:0xffb347, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
+  g.add(ring);
+  const el = document.createElement('div'); el.className='idea-label'; el.textContent = (rec.final?rec.final.title:rec.title); el.style.cursor='pointer';
+  el.onclick = () => openIdea(rec.id);
+  const lab = new CSS2DObject(el); lab.position.set(0,1.1,0); g.add(lab);
+  ideaGroup.add(g); ideaObjs.set(rec.id, g); return g;
+}
+function stepIdeas(){
+  for (const g of ideaGroup.children){
+    const sp=g.children[0], ring=g.children[1]; ring.lookAt(camera.position);
+    const age=(performance.now()-g.userData.born)/1000;
+    if (g.userData.burst && age<1.5){ const k=age/1.5; sp.scale.setScalar(0.1 + (1-Math.pow(1-k,3))*(2.2+(k<0.6?(0.6-k)*6:0))); ring.scale.setScalar(0.2+k*0.8); }
+    else { sp.scale.setScalar(2.2 + 0.15*Math.sin(age*2)); ring.scale.setScalar(1); }
+    const dd = g.position.distanceTo(camera.position); g.children[2].element.style.opacity = THREE.MathUtils.clamp(1-(dd-40)/120, 0.25, 1);
+  }
+}
+async function loadIdeas(){
+  try { const list = await (await fetch('/api/ideas?limit=200')).json(); for (const r of list) spawnIdea(r); return list; } catch { return []; }
+}
+const ideaList = await loadIdeas();
+
+// run the loop
+let running = false;
+async function runIdea(body){
+  if (running) return; running = true;
+  closePanel(); mat.uniforms.uSel.value=-1;
+  srcColors = body.mode==='blend' ? mixSel.map(i=>clusterColor[clusterId[i]].clone()) : [];
+  const title = body.mode==='blend' ? 'Mixing' : 'Filling the gap';
+  openPanel(`<div class="kicker" style="color:var(--pink)">${title}</div><div id="srcs"></div><div id="drafts"></div><div class="thinking" id="think"><i></i><i></i><i></i> &nbsp;listening to the neighbourhood…</div>`);
+  const drafts = $('#drafts'); let n=0, maxN=3;
+  try {
+    const r = await fetch('/api/idea', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) });
+    if (!r.ok){ let m='request failed'; try{ m=(await r.json()).detail||m; }catch{} throw new Error(m); }
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf='';
+    while (true){
+      const {value, done} = await reader.read(); if (done) break; buf += dec.decode(value, {stream:true});
+      let k; while ((k = buf.indexOf('\n\n')) >= 0){
+        const chunk = buf.slice(0,k); buf = buf.slice(k+2);
+        const ev = /^event: (.*)$/m.exec(chunk)?.[1]; const data = /^data: (.*)$/m.exec(chunk)?.[1]; if (!ev||!data) continue;
+        const d = JSON.parse(data);
+        if (ev==='target'){
+          maxN = d.max_drafts; if (body.mode==='hole') srcColors = d.sources.map(s=>clusterColor[clusterId[appidToIdx.get(s.appid)]]||new THREE.Color(1,1,1));
+          startParticles(d.sources.map(s=>s.pos), d.pos); flyTo(d.pos.map(v=>v*SCALE), 16);
+          $('#srcs').innerHTML = `<div class="chips" style="margin-bottom:8px">${d.sources.map((s,i)=>`<span class="chip"><i style="background:#${sourceColor(i).getHexString()}"></i>${esc(s.name)}</span>`).join('')}</div>`;
+          $('#think').lastChild.textContent = ' writing draft 1…';
+        } else if (ev==='draft'){
+          n = d.n; const ok = d.verdict==='accepted';
+          fireProbe(d.pos, d.twin.pos, ok);
+          drafts.insertAdjacentHTML('beforeend', `<div class="draft ${ok?'accepted':'rej'}">
+            <div class="meta"><span>draft ${d.n}/${maxN}</span><span class="badge ${ok?'ok':'rej'}">${esc(d.verdict)}</span></div>
+            <h3>${esc(d.title)}</h3><p>${esc(d.pitch)}</p>
+            <div class="row" style="border:0;padding:0"><span>closest existing</span><b>${esc(d.twin.name)}</b></div>
+            <div class="bar ${ok?'g':'p'}"><i style="width:${d.twin.sim*100}%"></i><u style="left:${d.twin.sim*100}%"></u></div>
+            <div class="meta"><span>similarity ${d.twin.sim.toFixed(2)}</span><span>${d.twin_pct.toFixed(1)}% of games have a closer twin</span></div>
+            ${d.sources && body.mode==='blend' ? `<div class="meta" style="margin-top:6px">${d.sources.map(s=>`<span>${esc(s.name.slice(0,18))} ${s.sim.toFixed(2)}</span>`).join('')}</div>`:''}
+          </div>`);
+          $('#think').lastChild.textContent = ok ? ' settled.' : (n<maxN ? ` too close to ${d.twin.name} — rewriting (draft ${n+1})…` : ' keeping the best draft…');
+          panel.scrollTop = panel.scrollHeight;
+        } else if (ev==='final'){
+          stopParticles(); $('#think').remove();
+          const f = d.final; spawnIdea(d, true); setTimeout(()=>flyTo(f.pos.map(v=>v*SCALE), 7), 300);
+          drafts.insertAdjacentHTML('beforeend', `<div class="draft accepted" style="border-color:var(--orange)">
+            <div class="kicker">a new star · ${esc(d.mode)}</div><h2 style="margin:0 0 6px">${esc(f.title)}</h2>
+            <p style="color:var(--orange);font-weight:500">${esc(f.hook)}</p><p>${esc(f.pitch)}</p>
+            <ul class="mech">${f.mechanics.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
+            <div class="tags">${f.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+            <div class="big">${f.twin_pct.toFixed(1)}%<small>of Steam games have a closer twin</small></div>
+            <div class="row" style="margin-top:8px"><span>closest existing</span><b>${esc(f.twin.name)} · ${f.twin.sim.toFixed(2)}</b></div>
+            <div class="row"><a class="link" href="?idea=${d.id}" id="shareIdea">share this idea ↗</a><a class="link" href="#" id="again">${body.mode==='blend'?'mix again':'try again'}</a></div></div>`);
+          $('#shareIdea').onclick = e => { e.preventDefault(); const u = location.origin+location.pathname+'?idea='+d.id; navigator.clipboard?.writeText(u); e.target.textContent='link copied ✓'; };
+          $('#again').onclick = e => { e.preventDefault(); runIdea(body); };
+          panel.scrollTop = panel.scrollHeight;
+        } else if (ev==='error'){ throw new Error(d.message); }
+      }
+    }
+  } catch (e){
+    stopParticles(); const t = $('#think'); if (t) t.remove();
+    drafts.insertAdjacentHTML('beforeend', `<div class="draft rej"><div class="badge rej">error</div><p style="margin-top:8px">${esc(e.message)}</p></div>`);
+  }
+  running = false;
+}
+async function openIdea(id){
+  try {
+    const d = await (await fetch('/api/idea/'+id)).json(); const f = d.final; spawnIdea(d); flyTo(f.pos.map(v=>v*SCALE), 7);
+    openPanel(`<div class="kicker">idea · ${esc(d.mode)} · ${new Date(d.ts*1000).toLocaleDateString()}</div><h2>${esc(f.title)}</h2>
+      <p style="color:var(--orange);font-weight:500">${esc(f.hook)}</p><p>${esc(f.pitch)}</p>
+      <ul class="mech">${f.mechanics.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
+      <div class="tags">${f.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+      <div class="kicker">${d.mode==='blend'?'mixed from':'surrounded by'}</div>
+      <div class="list">${d.sources.map(s=>`<div data-i="${appidToIdx.get(s.appid)}"><span>${esc(s.name)}</span></div>`).join('')}</div>
+      <div class="big">${f.twin_pct.toFixed(1)}%<small>of Steam games have a closer twin</small></div>
+      <div class="row" style="margin-top:8px"><span>closest existing</span><b>${esc(f.twin.name)} · ${f.twin.sim.toFixed(2)}</b></div>
+      <div class="row"><span>drafts</span><b>${d.drafts.map(x=>x.verdict==='accepted'?'●':'○').join(' ')}</b></div>`);
+    panel.querySelectorAll('.list div').forEach(el => el.onclick = () => { const i=+el.dataset.i; if (!isNaN(i)) selectGame(i); });
+  } catch { }
+}
+function showIdeas(){
+  openPanel(`<div class="kicker">ideas</div><h2>New stars</h2>
+    <p>Games that don't exist yet, placed where they'd live. ${ideaList.length ? '' : 'None yet — mix two games or open an empty region.'}</p>
+    <div class="list">${ideaList.map(r=>`<div data-id="${r.id}"><span>${esc(r.title)}</span><small>${r.twin_pct.toFixed(0)}% · ${esc(r.mode)}</small></div>`).join('')}</div>`);
+  panel.querySelectorAll('.list div').forEach(d => d.onclick = () => openIdea(d.dataset.id));
+}
+$('#bIdeas').onclick = showIdeas;
+const urlIdea = new URLSearchParams(location.search).get('idea');
+if (urlIdea) setTimeout(()=>openIdea(urlIdea), 800);
 
 // ---------------------------------------------------------------- loop
 $('#stats').innerHTML = `<b>${fmt(stats.games)}</b> games · <b>${stats.clusters}</b> clusters · <b>${stats.holes}</b> holes · <b>${fmt(stats.reviews_total)}</b> reviews`;
@@ -360,10 +594,12 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
   mat.uniforms.uScale.value = innerHeight/2;
 });
-const camPos = new THREE.Vector3();
+const camPos = new THREE.Vector3(); let lastT = performance.now();
 function animate(){
   requestAnimationFrame(animate);
-  stepFly(); controls.update();
+  const now = performance.now(); const dt = Math.min(0.05, (now-lastT)/1000); lastT = now;
+  stepFly(); controls.update(); stepParticles(dt); stepProbe(); stepIdeas();
+  pMat.uniforms.uScale.value = mat.uniforms.uScale.value;
   const d = camera.position.distanceTo(controls.target);
   for (const o of labelObjs){
     const dd = o.position.distanceTo(camera.position);

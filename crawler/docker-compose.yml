@@ -27,9 +27,27 @@ services:
       - steamdata:/data
     restart: "no"
 
-  # 3) site: three.js viewer + /data/web dosyaları  -> bu servise domain ver
+  # 3) fikir API'si: Claude + embedding geri besleme döngüsü, galeri  (/api/*)
+  api:
+    build: ../api
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-5-5}
+      - EMBED_MODEL=${EMBED_MODEL:-BAAI/bge-small-en-v1.5}
+      - MAX_DRAFTS=${MAX_DRAFTS:-3}
+      - PER_IP_PER_HOUR=${PER_IP_PER_HOUR:-6}
+      - DAILY_CAP=${DAILY_CAP:-300}
+    volumes:
+      - steamdata:/data
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  # 4) site: three.js viewer + /data/web dosyaları + /api proxy  -> bu servise domain ver
   web:
     build: ../web
+    depends_on:
+      - api
     expose:
       - "80"
     volumes:
