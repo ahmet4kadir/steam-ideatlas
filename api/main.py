@@ -158,7 +158,9 @@ def sse(event, data): return f"event: {event}\ndata: {json.dumps(data, ensure_as
 
 @app.post("/api/idea")
 async def idea(req: IdeaReq, request: Request):
-    ip = request.headers.get("x-forwarded-for", request.client.host).split(",")[0].strip()
+    ip = (request.headers.get("cf-connecting-ip")                       # Cloudflare proxy açıkken gerçek ziyaretçi
+          or request.headers.get("x-real-ip")
+          or request.headers.get("x-forwarded-for", request.client.host).split(",")[0].strip())
     if req.mode == "blend":
         ids = [S["appid_to_i"][a] for a in (req.appids or []) if a in S["appid_to_i"]]
         if not 2 <= len(ids) <= 3: raise HTTPException(400, "pick 2 or 3 games")
