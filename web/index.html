@@ -484,6 +484,7 @@ function spawnIdea(rec, burst=false){
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.7,0.78,48), new THREE.MeshBasicMaterial({ color:0xffb347, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
   g.add(ring);
   const el = document.createElement('div'); el.className='idea-label'; el.textContent = (rec.final?rec.final.title:rec.title); el.style.cursor='pointer';
+  el.title = (rec.sources||[]).map(x=>x.name||x).join(' + ');
   el.onclick = () => openIdea(rec.id);
   const lab = new CSS2DObject(el); lab.position.set(0,1.1,0); g.add(lab);
   ideaGroup.add(g); ideaObjs.set(rec.id, g); return g;
@@ -548,10 +549,13 @@ async function runIdea(body){
             <ul class="mech">${f.mechanics.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
             <div class="tags">${f.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
             <div class="big">${f.twin_pct.toFixed(1)}%<small>of Steam games have a closer twin</small></div>
-            <div class="row" style="margin-top:8px"><span>closest existing</span><b>${esc(f.twin.name)} · ${f.twin.sim.toFixed(2)}</b></div>
+            <div class="row" style="margin-top:8px"><span>${d.mode==='blend'?'mixed from':'surrounded by'}</span></div>
+            <div class="chips" style="margin:0 0 8px">${d.sources.map(sx=>`<span class="chip" data-i="${appidToIdx.get(sx.appid)}" style="cursor:pointer">${esc(sx.name)}</span>`).join('')}</div>
+            <div class="row"><span>closest existing</span><b>${esc(f.twin.name)} · ${f.twin.sim.toFixed(2)}</b></div>
             <div class="row"><a class="link" href="?idea=${d.id}" id="shareIdea">share this idea ↗</a><a class="link" href="#" id="again">${body.mode==='blend'?'mix again':'try again'}</a></div></div>`);
           $('#shareIdea').onclick = e => { e.preventDefault(); const u = location.origin+location.pathname+'?idea='+d.id; navigator.clipboard?.writeText(u); e.target.textContent='link copied ✓'; };
           $('#again').onclick = e => { e.preventDefault(); runIdea(body); };
+          drafts.querySelectorAll('.chip[data-i]').forEach(c => c.onclick = () => { const i=+c.dataset.i; if (!isNaN(i)) selectGame(i); });
           panel.scrollTop = panel.scrollHeight;
         } else if (ev==='error'){ throw new Error(d.message); }
       }
@@ -580,7 +584,7 @@ async function openIdea(id){
 function showIdeas(){
   openPanel(`<div class="kicker">ideas</div><h2>New stars</h2>
     <p>Games that don't exist yet, placed where they'd live. ${ideaList.length ? '' : 'None yet — mix two games or open an empty region.'}</p>
-    <div class="list">${ideaList.map(r=>`<div data-id="${r.id}"><span>${esc(r.title)}</span><small>${r.twin_pct.toFixed(0)}% · ${esc(r.mode)}</small></div>`).join('')}</div>`);
+    <div class="list">${ideaList.map(r=>`<div data-id="${r.id}" style="flex-direction:column;align-items:flex-start;gap:2px"><span>${esc(r.title)}</span><small>${r.mode==='blend'?esc(r.sources.join(' + ')):'empty space · '+esc(r.sources.slice(0,3).join(', '))+'…'} · ${r.twin_pct.toFixed(0)}%</small></div>`).join('')}</div>`);
   panel.querySelectorAll('.list div').forEach(d => d.onclick = () => openIdea(d.dataset.id));
 }
 $('#bIdeas').onclick = showIdeas;
