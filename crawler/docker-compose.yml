@@ -37,6 +37,8 @@ services:
       - MAX_DRAFTS=${MAX_DRAFTS:-3}
       - PER_IP_PER_HOUR=${PER_IP_PER_HOUR:-6}
       - DAILY_CAP=${DAILY_CAP:-300}
+      - TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY:-}
+      - TURNSTILE_SECRET=${TURNSTILE_SECRET:-}
     volumes:
       - steamdata:/data
     expose:

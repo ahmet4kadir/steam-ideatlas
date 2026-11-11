@@ -17,8 +17,7 @@
   canvas{display:block}
   #app{position:fixed;inset:0}
   #labels{position:absolute;inset:0;pointer-events:none}
-  .label{font:600 11px/1 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#fff;
-         text-shadow:0 0 6px #000,0 0 14px #000;white-space:nowrap;transition:opacity .25s}
+  .label{white-space:nowrap;transition:opacity .25s}
   .ui{position:absolute;z-index:5;pointer-events:none}
   .ui *{pointer-events:auto}
   #top{top:18px;left:20px}
@@ -92,6 +91,29 @@
   .thinking i:nth-child(2){animation-delay:.2s} .thinking i:nth-child(3){animation-delay:.4s}
   @keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
   @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  #legend{top:84px;left:20px;width:220px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;backdrop-filter:blur(10px)}
+  #legend .kicker{font:600 10px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;display:flex;justify-content:space-between;cursor:pointer}
+  #legend .kicker b{color:var(--mute);font-weight:400}
+  .lrow{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:12px;cursor:pointer;border-radius:6px}
+  .lrow:hover{background:#161a26}
+  .lrow i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 6px currentColor}
+  .lrow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lrow small{margin-left:auto;color:var(--mute);font:10px "JetBrains Mono",monospace}
+  #legend.min .lbody{display:none}
+  .label{font:600 10px/1 "JetBrains Mono",monospace;letter-spacing:.08em;text-transform:uppercase;color:#fff;
+         padding:4px 8px 4px 18px;border-radius:999px;background:rgba(8,10,16,.72);border:1px solid rgba(255,255,255,.08);position:relative;cursor:pointer;pointer-events:auto}
+  .label::before{content:"";position:absolute;left:7px;top:50%;margin-top:-3px;width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 6px currentColor}
+  .label.big{font-size:12px;padding:5px 10px 5px 20px}
+  #intro{position:fixed;inset:0;z-index:15;display:grid;place-items:center;background:rgba(5,6,10,.55);backdrop-filter:blur(3px)}
+  #intro .card{width:min(440px,calc(100vw - 40px));background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+  #intro h2{margin:0 0 10px;font:600 20px Inter}
+  #intro p{margin:0 0 10px;font-size:14px;line-height:1.55;color:#c9cdd8}
+  #intro .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  #intro button{margin-top:8px;padding:9px 16px;border-radius:8px;border:1px solid var(--orange);background:transparent;color:var(--orange);font:600 13px Inter;cursor:pointer}
+  .keybox{display:flex;gap:6px;margin:8px 0}
+  .keybox input{flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:#0d1017;color:var(--fg);font:12px "JetBrains Mono",monospace;outline:none}
+  .keybox button{padding:7px 10px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--fg);font:12px Inter;cursor:pointer}
+  @media (max-width:640px){#legend{display:none}}
   .glabel{font:500 11px Inter;color:#e8eaf0;text-shadow:0 0 4px #000,0 0 10px #000;white-space:nowrap;padding-left:9px;position:relative;transition:opacity .2s;pointer-events:auto;cursor:pointer}
   .glabel::before{content:"";position:absolute;left:0;top:50%;width:5px;height:1px;background:#8a90a3}
   .idea-label{font:600 12px "JetBrains Mono",monospace;letter-spacing:.06em;color:#fff;text-shadow:0 0 8px var(--orange),0 0 16px #000;white-space:nowrap;
@@ -122,11 +144,19 @@
   <button class="btn" id="bLoners">Loners</button>
   <button class="btn" id="bAbout">?</button>
 </div>
+<div class="ui" id="legend"><div class="kicker" id="legendHead"><span>colour = cluster</span><b>−</b></div><div class="lbody" id="legendBody"></div></div>
 <div class="ui" id="mix">
   <div class="kicker">mix · pick 2–3 games, then ask what lives between them</div>
   <div class="chips" id="chips"></div>
 </div>
 <div class="ui" id="panel"></div>
+<div id="intro" style="display:none"><div class="card">
+  <h2>Every Steam game, as a star.</h2>
+  <p><span class="dot" style="background:#fff"></span>Each dot is one of <b id="introN"></b> Steam games. Games that read alike sit close together; a dot's brightness is its review count.</p>
+  <p><span class="dot" style="background:var(--cyan)"></span><b>Colour</b> is a genre neighbourhood — the legend on the left names them. Scroll to dive in; names appear as you get close. Click any dot.</p>
+  <p><span class="dot" style="background:var(--pink)"></span><b>Mix</b> two games and an AI designs the game between them, measured against all the others. <b style="color:var(--cyan)">Empty space</b> shows where nothing exists yet.</p>
+  <button id="introGo">Explore →</button></div></div>
+<div id="ts" style="position:fixed;bottom:0;left:0;opacity:0;pointer-events:none"></div>
 <div class="ui" id="hint">drag · orbit &nbsp; scroll · zoom &nbsp; click · game &nbsp; mix · pick 2-3 games &nbsp; esc · close</div>
 <div class="ui" id="credit"><a href="https://ahmetkadir.com">ahmetkadir.com</a> · data: Steam &amp; SteamSpy</div>
 
@@ -175,33 +205,35 @@ const labelRenderer = new CSS2DRenderer({ element: $('#labels') });
 labelRenderer.setSize(innerWidth, innerHeight);
 
 // points
-const positions = new Float32Array(N*3); const colors = new Float32Array(N*3); const sizes = new Float32Array(N); const idxAttr = new Float32Array(N);
+const positions = new Float32Array(N*3); const colors = new Float32Array(N*3); const sizes = new Float32Array(N); const idxAttr = new Float32Array(N); const clAttr = new Float32Array(N);
 const clusterColor = clusters.map(c => new THREE.Color().setHSL(c.hue/360, 0.85, 0.62));
 const tmp = new THREE.Color();
 for (let i=0;i<N;i++){
   positions[i*3] = pos16[i*3]/32767*SCALE; positions[i*3+1] = pos16[i*3+1]/32767*SCALE; positions[i*3+2] = pos16[i*3+2]/32767*SCALE;
   tmp.copy(clusterColor[clusterId[i]] || clusterColor[0]); tmp.offsetHSL((Math.random()-0.5)*0.04, 0, (Math.random()-0.5)*0.12);
   colors[i*3]=tmp.r; colors[i*3+1]=tmp.g; colors[i*3+2]=tmp.b;
-  sizes[i] = 0.35 + (size8[i]/255)*2.2; idxAttr[i] = i;
+  sizes[i] = 0.35 + (size8[i]/255)*2.2; idxAttr[i] = i; clAttr[i] = clusterId[i];
 }
 const geo = new THREE.BufferGeometry();
 geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
 geo.setAttribute('aIndex', new THREE.BufferAttribute(idxAttr, 1));
+geo.setAttribute('aCluster', new THREE.BufferAttribute(clAttr, 1));
 const mat = new THREE.ShaderMaterial({
-  uniforms: { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0} },
+  uniforms: { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0}, uHi:{value:-1}, uMin:{value: Math.min(devicePixelRatio,2)*1.4} },
   vertexShader: `
-    attribute float aSize; attribute float aIndex; varying vec3 vC; varying float vA; uniform float uScale, uSel, uDim;
+    attribute float aSize; attribute float aIndex; attribute float aCluster; varying vec3 vC; varying float vA; uniform float uScale, uSel, uDim, uHi, uMin;
     void main(){
       vec4 mv = modelViewMatrix * vec4(position,1.0);
       float sel = (abs(aIndex - uSel) < 0.5) ? 1.0 : 0.0;
       float s = aSize * (1.0 + sel*3.0);
       float dist = -mv.z;
-      gl_PointSize = clamp(s * uScale / dist, 1.0, 9.0 + sel*10.0);
-      float depthFade = mix(0.35, 1.0, smoothstep(220.0, 30.0, dist));
+      gl_PointSize = clamp(s * uScale / dist, uMin, 9.0 + sel*10.0);
+      float depthFade = mix(0.5, 1.0, smoothstep(220.0, 30.0, dist));
+      float hi = (uHi < 0.0) ? 1.0 : ((abs(aCluster - uHi) < 0.5) ? 1.0 : 0.08);
       vC = mix(color, vec3(1.0,0.75,0.3), sel);
-      vA = mix(1.0, 0.12, uDim) * (0.26 + sel*0.74) * depthFade;
+      vA = mix(1.0, 0.12, uDim) * (0.26 + sel*0.74) * depthFade * max(hi, sel);
       gl_Position = projectionMatrix * mv;
     }`,
   fragmentShader: `
@@ -224,14 +256,44 @@ composer.addPass(bloom); composer.addPass(new OutputPass());
 
 // cluster labels
 const labelObjs = [];
-const topClusters = [...clusters].sort((a,b)=>b.n-a.n).slice(0, 120);
+const topClusters = [...clusters].sort((a,b)=>b.n-a.n).slice(0, 160);
+const bigN = topClusters[Math.min(11, topClusters.length-1)]?.n || 0;
 for (const c of topClusters){
-  const el = document.createElement('div'); el.className='label'; el.textContent = c.label;
-  el.style.color = '#'+clusterColor[c.id].clone().offsetHSL(0,0,0.15).getHexString();
+  const el = document.createElement('div'); el.className='label'+(c.n>=bigN?' big':''); el.textContent = c.label;
+  el.style.color = '#'+clusterColor[c.id].clone().offsetHSL(0,0,0.18).getHexString();
+  el.onclick = () => flyTo(c.center.map(v=>v*SCALE), 30);
+  el.onmouseenter = () => setHi(c.id); el.onmouseleave = () => setHi(-1);
   const o = new CSS2DObject(el); o.position.set(c.center[0]*SCALE, c.center[1]*SCALE, c.center[2]*SCALE);
   o.userData = c; scene.add(o); labelObjs.push(o);
 }
 let showLabels = true;
+function setHi(id){ mat.uniforms.uHi.value = id; }
+// screen-space overlap culling for any set of CSS2D labels
+const _v = new THREE.Vector3();
+function cullLabels(objs, pad=6){
+  const kept = [];
+  for (const o of objs){
+    if (o.userData.hidden){ o.element.style.visibility='hidden'; continue; }
+    _v.copy(o.position); if (o.parent && o.parent !== scene) o.parent.localToWorld(_v);
+    _v.project(camera);
+    if (_v.z > 1 || _v.x < -1.1 || _v.x > 1.1 || _v.y < -1.1 || _v.y > 1.1){ o.element.style.visibility='hidden'; continue; }
+    const x = (_v.x+1)/2*innerWidth, y = (1-_v.y)/2*innerHeight, w = (o.userData.w ||= o.element.offsetWidth||80)+pad, h = (o.userData.h ||= o.element.offsetHeight||16)+pad;
+    let ok = true; for (const k of kept){ if (Math.abs(k.x-x) < (k.w+w)/2 && Math.abs(k.y-y) < (k.h+h)/2){ ok=false; break; } }
+    o.element.style.visibility = ok ? 'visible' : 'hidden'; if (ok) kept.push({x,y,w,h});
+  }
+}
+// legend
+const legendBody = $('#legendBody'); let legendAll = false;
+function renderLegend(){
+  const list = legendAll ? topClusters : topClusters.slice(0, 12);
+  legendBody.innerHTML = list.map(c=>`<div class="lrow" data-c="${c.id}"><i style="background:#${clusterColor[c.id].getHexString()};color:#${clusterColor[c.id].getHexString()}"></i><span>${esc(c.label)}</span><small>${fmt(c.n)}</small></div>`).join('')
+    + `<div class="lrow" id="legendMore" style="color:var(--mute)"><span>${legendAll?'show fewer':'all '+topClusters.length+' clusters…'}</span></div>`;
+  legendBody.querySelectorAll('.lrow[data-c]').forEach(r => { const c = clusters[+r.dataset.c];
+    r.onmouseenter = () => setHi(c.id); r.onmouseleave = () => setHi(-1); r.onclick = () => flyTo(c.center.map(v=>v*SCALE), 30); });
+  $('#legendMore').onclick = () => { legendAll = !legendAll; renderLegend(); };
+}
+renderLegend();
+$('#legendHead').onclick = () => { const l=$('#legend'); l.classList.toggle('min'); $('#legendHead b').textContent = l.classList.contains('min')?'+':'−'; };
 
 // nearby game labels (shown when zoomed in)
 const CELL = 4; const grid = new Map();
@@ -255,9 +317,10 @@ function updateGameLabels(d){
     if ((px-controls.target.x)**2+(py-controls.target.y)**2+(pz-controls.target.z)**2 > r*r) continue;
     let ok=true; for (const j of picked){ if ((positions[j*3]-px)**2+(positions[j*3+1]-py)**2+(positions[j*3+2]-pz)**2 < minSep*minSep){ ok=false; break; } }
     if (ok) picked.push(i); }
-  gLabels.forEach((o,k)=>{ const i = picked[k]; if (i===undefined){ o.element.style.opacity=0; o.userData.i=-1; return; }
-    o.userData.i=i; o.position.set(positions[i*3], positions[i*3+1], positions[i*3+2]); o.element.textContent = names[i][1];
+  gLabels.forEach((o,k)=>{ const i = picked[k]; if (i===undefined){ o.element.style.opacity=0; o.userData.i=-1; o.userData.hidden=true; return; }
+    o.userData.i=i; o.userData.hidden=false; o.userData.w=0; o.position.set(positions[i*3], positions[i*3+1], positions[i*3+2]); o.element.textContent = names[i][1];
     o.element.style.opacity = THREE.MathUtils.clamp((28-d)/10, 0, 1) * (0.5 + 0.5*size8[i]/255); });
+  cullLabels(gLabels, 4);
 }
 
 // hole markers
@@ -382,7 +445,8 @@ function showAbout(){
     <p>${fmt(stats.games)} Steam games, each turned into a vector by a text-embedding model from its description and tags, then projected to 3D with UMAP. Nearby points are similar games; colour is the cluster; brightness is review count.</p>
     <p><b style="color:var(--cyan)">Empty space</b> marks regions surrounded by games with nothing inside — where a game idea unlike existing ones would sit. <b style="color:var(--orange)">Loners</b> are the games farthest from any neighbour.</p>
     <p><b style="color:var(--pink)">Mix</b> picks 2–3 games and asks a language model for the game between them. Each draft is embedded with the same model that built the map and measured against every Steam game; if it lands too close to something that exists, the model is told what, and rewrites. The result becomes a new star on the map.</p>
-    <p>Built ${stats.built} · data from the Steam store API and SteamSpy · by <a class="link" href="https://ahmetkadir.com">Ahmet Kadir Doğan</a></p>`);
+    <p>Built ${stats.built} · data from the Steam store API and SteamSpy · by <a class="link" href="https://ahmetkadir.com">Ahmet Kadir Doğan</a></p>${keyBox()}`);
+  bindKeyBox();
 }
 function esc(s){ return String(s??'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -455,7 +519,8 @@ const pPos = new Float32Array(PN*3), pCol = new Float32Array(PN*3), pSize = new 
 for (let i=0;i<PN;i++){ pSize[i]=0.9+Math.random()*1.4; pIdx[i]=-1; }
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3)); pGeo.setAttribute('color', new THREE.BufferAttribute(pCol,3));
 pGeo.setAttribute('aSize', new THREE.BufferAttribute(pSize,1)); pGeo.setAttribute('aIndex', new THREE.BufferAttribute(pIdx,1));
-const pMat = mat.clone(); pMat.uniforms = { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0} };
+const pMat = mat.clone(); pMat.uniforms = { uScale:{value: innerHeight/2}, uSel:{value:-1}, uDim:{value:0}, uTime:{value:0}, uHi:{value:-1}, uMin:{value:2} };
+const pCl = new Float32Array(PN); pGeo.setAttribute('aCluster', new THREE.BufferAttribute(pCl,1));
 const particles = new THREE.Points(pGeo, pMat); particles.visible=false; particles.frustumCulled=false; scene.add(particles);
 const P = { on:false, srcs:[], target:new THREE.Vector3(), t:new Float32Array(PN), side:[], speed:new Float32Array(PN), core:null, ring:null, t0:0 };
 for (let i=0;i<PN;i++){ P.t[i]=Math.random(); P.speed[i]=0.25+Math.random()*0.35; P.side.push(new THREE.Vector3().randomDirection().multiplyScalar(0.6+Math.random()*2.2)); }
@@ -506,33 +571,58 @@ function stepProbe(){
 
 // idea stars
 const ideaGroup = new THREE.Group(); scene.add(ideaGroup); const ideaObjs = new Map();
+const ringTex = (() => { const c=document.createElement('canvas'); c.width=c.height=128; const g=c.getContext('2d');
+  g.strokeStyle='rgba(255,179,71,1)'; g.lineWidth=5; g.beginPath(); g.arc(64,64,52,0,Math.PI*2); g.stroke();
+  g.strokeStyle='rgba(255,179,71,.35)'; g.lineWidth=2; g.beginPath(); g.arc(64,64,60,0,Math.PI*2); g.stroke(); return new THREE.CanvasTexture(c); })();
+const PX = px => px / innerHeight * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov/2));   // screen-constant sprite scale
 function spawnIdea(rec, burst=false){
   if (ideaObjs.has(rec.id)) return ideaObjs.get(rec.id);
   const pos = (rec.final ? rec.final.pos : rec.pos).map(v=>v*SCALE);
   const g = new THREE.Group(); g.position.set(...pos); g.userData={ idea:rec, born:performance.now(), burst };
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xffb347, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
-  sp.scale.setScalar(burst?0.05:0.9); g.add(sp);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.32,0.36,48), new THREE.MeshBasicMaterial({ color:0xffb347, transparent:true, opacity:0.6, side:THREE.DoubleSide, depthWrite:false }));
-  g.add(ring);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:glowTex, color:0xffb347, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:false }));
+  sp.scale.setScalar(PX(burst?2:34)); g.add(sp);
+  const ring = new THREE.Sprite(new THREE.SpriteMaterial({ map:ringTex, transparent:true, opacity:0.9, depthWrite:false, sizeAttenuation:false }));
+  ring.scale.setScalar(PX(30)); g.add(ring);
   const el = document.createElement('div'); el.className='idea-label'; el.textContent = (rec.final?rec.final.title:rec.title); el.style.cursor='pointer';
   el.title = (rec.sources||[]).map(x=>x.name||x).join(' + ');
   el.onclick = () => openIdea(rec.id);
-  const lab = new CSS2DObject(el); lab.position.set(0,0.55,0); g.add(lab);
+  const lab = new CSS2DObject(el); lab.position.set(0,0,0); el.style.transform='translateY(-26px)'; g.add(lab);
   ideaGroup.add(g); ideaObjs.set(rec.id, g); return g;
 }
 function stepIdeas(){
   for (const g of ideaGroup.children){
-    const sp=g.children[0], ring=g.children[1]; ring.lookAt(camera.position);
+    const sp=g.children[0], ring=g.children[1];
     const age=(performance.now()-g.userData.born)/1000;
-    if (g.userData.burst && age<1.5){ const k=age/1.5; sp.scale.setScalar(0.05 + (1-Math.pow(1-k,3))*(0.9+(k<0.6?(0.6-k)*3:0))); ring.scale.setScalar(0.2+k*0.8); }
-    else { sp.scale.setScalar(0.9 + 0.08*Math.sin(age*2)); ring.scale.setScalar(1); }
-    const dd = g.position.distanceTo(camera.position); g.children[2].element.style.opacity = THREE.MathUtils.clamp(1-(dd-40)/120, 0.25, 1);
+    if (g.userData.burst && age<1.5){ const k=age/1.5; sp.scale.setScalar(PX(2 + (1-Math.pow(1-k,3))*(34+(k<0.6?(0.6-k)*80:0)))); ring.scale.setScalar(PX(30*(0.2+k*0.8))); }
+    else { sp.scale.setScalar(PX(34 + 3*Math.sin(age*2))); ring.scale.setScalar(PX(30)); }
+    const dd = g.position.distanceTo(camera.position); g.children[2].element.style.opacity = THREE.MathUtils.clamp(1-(dd-60)/160, 0.3, 1);
   }
 }
 async function loadIdeas(){
   try { const list = await (await fetch('/api/ideas?limit=200')).json(); for (const r of list) spawnIdea(r); return list; } catch { return []; }
 }
 const ideaList = await loadIdeas();
+
+// turnstile (bot check) + own key
+let cfg = { turnstile_site_key:'' }; try { cfg = await (await fetch('/api/config')).json(); } catch {}
+let tsWidget = null, tsToken = null, tsWaiters = [];
+if (cfg.turnstile_site_key){
+  const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__tsReady'; sc.async = true; document.head.appendChild(sc);
+  window.__tsReady = () => { tsWidget = turnstile.render('#ts', { sitekey: cfg.turnstile_site_key, appearance:'interaction-only', 'refresh-expired':'auto',
+    callback: t => { tsToken = t; tsWaiters.splice(0).forEach(f=>f(t)); }, 'error-callback': () => { tsWaiters.splice(0).forEach(f=>f(null)); } }); };
+}
+function getTsToken(){
+  if (!cfg.turnstile_site_key) return Promise.resolve(null);
+  if (tsToken){ const t = tsToken; tsToken = null; setTimeout(()=>{ try{ turnstile.reset(tsWidget); }catch{} }, 0); return Promise.resolve(t); }
+  return new Promise(res => { tsWaiters.push(res); setTimeout(()=>res(null), 12000); try{ if (tsWidget!==null) turnstile.reset(tsWidget); }catch{} });
+}
+const ownKey = () => { try { return localStorage.getItem('ideatlas_key') || ''; } catch { return ''; } };
+function keyBox(){
+  return `<div class="kicker" style="margin-top:12px">your own Anthropic key (optional)</div>
+    <p style="font-size:12px">Unlimited mixes, billed to you. Stays in this browser only; never stored on the server.</p>
+    <div class="keybox"><input id="okey" type="password" placeholder="sk-ant-…" value="${esc(ownKey())}"><button id="okeySave">save</button></div>`;
+}
+function bindKeyBox(){ const b=$('#okeySave'); if (!b) return; b.onclick = () => { try { const v=$('#okey').value.trim(); if (v) localStorage.setItem('ideatlas_key', v); else localStorage.removeItem('ideatlas_key'); b.textContent='saved ✓'; } catch {} }; }
 
 // run the loop
 let running = false;
@@ -544,8 +634,11 @@ async function runIdea(body){
   openPanel(`<div class="kicker" style="color:var(--pink)">${title}</div><div id="srcs"></div><div id="drafts"></div><div class="thinking" id="think"><i></i><i></i><i></i> &nbsp;listening to the neighbourhood…</div>`);
   const drafts = $('#drafts'); let n=0, maxN=3;
   try {
-    const r = await fetch('/api/idea', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) });
-    if (!r.ok){ let m='request failed'; try{ m=(await r.json()).detail||m; }catch{} throw new Error(m); }
+    const headers = {'content-type':'application/json'}; const k = ownKey(); if (k) headers['x-anthropic-key'] = k;
+    if (!k && !body.fresh){ /* cache may answer without a token */ }
+    const token = k ? null : await getTsToken();
+    const r = await fetch('/api/idea', { method:'POST', headers, body: JSON.stringify({ ...body, turnstile: token }) });
+    if (!r.ok){ let m='request failed'; try{ m=(await r.json()).detail||m; }catch{} const e=new Error(m); e.status=r.status; throw e; }
     const reader = r.body.getReader(); const dec = new TextDecoder(); let buf='';
     while (true){
       const {value, done} = await reader.read(); if (done) break; buf += dec.decode(value, {stream:true});
@@ -554,7 +647,8 @@ async function runIdea(body){
         const ev = /^event: (.*)$/m.exec(chunk)?.[1]; const data = /^data: (.*)$/m.exec(chunk)?.[1]; if (!ev||!data) continue;
         const d = JSON.parse(data);
         if (ev==='target'){
-          maxN = d.max_drafts; if (body.mode==='hole') srcColors = d.sources.map(s=>clusterColor[clusterId[appidToIdx.get(s.appid)]]||new THREE.Color(1,1,1));
+          maxN = d.max_drafts;
+          if (d.cached){ $('#think').lastChild.textContent = ' this combination was explored before — showing it.'; continue; } if (body.mode==='hole') srcColors = d.sources.map(s=>clusterColor[clusterId[appidToIdx.get(s.appid)]]||new THREE.Color(1,1,1));
           startParticles(d.sources.map(s=>s.pos), d.pos); flyTo(d.pos.map(v=>v*SCALE), 10);
           $('#srcs').innerHTML = `<div class="chips" style="margin-bottom:8px">${d.sources.map((s,i)=>`<span class="chip"><i style="background:#${sourceColor(i).getHexString()}"></i>${esc(s.name)}</span>`).join('')}</div>`;
           $('#think').lastChild.textContent = ' writing draft 1…';
@@ -573,9 +667,9 @@ async function runIdea(body){
           panel.scrollTop = panel.scrollHeight;
         } else if (ev==='final'){
           stopParticles(); $('#think').remove();
-          const f = d.final; spawnIdea(d, true); setTimeout(()=>flyTo(f.pos.map(v=>v*SCALE), 4), 300);
+          const f = d.final; spawnIdea(d, !d.cached); setTimeout(()=>flyTo(f.pos.map(v=>v*SCALE), 4), 300);
           drafts.insertAdjacentHTML('beforeend', `<div class="draft accepted" style="border-color:var(--orange)">
-            <div class="kicker">a new star · ${esc(d.mode)}</div><h2 style="margin:0 0 6px">${esc(f.title)}</h2>
+            <div class="kicker">${d.cached?'explored before · '+new Date(d.ts*1000).toLocaleDateString():'a new star'} · ${esc(d.mode)}</div><h2 style="margin:0 0 6px">${esc(f.title)}</h2>
             <p style="color:var(--orange);font-weight:500">${esc(f.hook)}</p><p>${esc(f.pitch)}</p>
             <ul class="mech">${f.mechanics.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>
             <div class="tags">${f.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
@@ -583,9 +677,9 @@ async function runIdea(body){
             <div class="row" style="margin-top:8px"><span>${d.mode==='blend'?'mixed from':'surrounded by'}</span></div>
             <div class="chips" style="margin:0 0 8px">${d.sources.map(sx=>`<span class="chip" data-i="${appidToIdx.get(sx.appid)}" style="cursor:pointer">${esc(sx.name)}</span>`).join('')}</div>
             <div class="row"><span>closest existing</span><b>${esc(f.twin.name)} · ${f.twin.sim.toFixed(2)}</b></div>
-            <div class="row"><a class="link" href="?idea=${d.id}" id="shareIdea">share this idea ↗</a><a class="link" href="#" id="again">${body.mode==='blend'?'mix again':'try again'}</a></div></div>`);
+            <div class="row"><a class="link" href="?idea=${d.id}" id="shareIdea">share this idea ↗</a><a class="link" href="#" id="again">${d.cached?'generate a fresh take':(body.mode==='blend'?'mix again':'try again')}</a></div></div>`);
           $('#shareIdea').onclick = e => { e.preventDefault(); const u = location.origin+location.pathname+'?idea='+d.id; navigator.clipboard?.writeText(u); e.target.textContent='link copied ✓'; };
-          $('#again').onclick = e => { e.preventDefault(); runIdea(body); };
+          $('#again').onclick = e => { e.preventDefault(); runIdea({ ...body, fresh:true }); };
           drafts.querySelectorAll('.chip[data-i]').forEach(c => c.onclick = () => { const i=+c.dataset.i; if (!isNaN(i)) selectGame(i); });
           panel.scrollTop = panel.scrollHeight;
         } else if (ev==='error'){ throw new Error(d.message); }
@@ -593,7 +687,8 @@ async function runIdea(body){
     }
   } catch (e){
     stopParticles(); const t = $('#think'); if (t) t.remove();
-    drafts.insertAdjacentHTML('beforeend', `<div class="draft rej"><div class="badge rej">error</div><p style="margin-top:8px">${esc(e.message)}</p></div>`);
+    drafts.insertAdjacentHTML('beforeend', `<div class="draft rej"><div class="badge rej">${e.status===429?'limit':'error'}</div><p style="margin-top:8px">${esc(e.message)}</p>${e.status===429?keyBox():''}</div>`);
+    bindKeyBox();
   }
   running = false;
 }
@@ -629,7 +724,7 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); labelRenderer.setSize(innerWidth, innerHeight);
   mat.uniforms.uScale.value = innerHeight/2;
 });
-const camPos = new THREE.Vector3(); let lastT = performance.now();
+const camPos = new THREE.Vector3(); let lastT = performance.now(), lastCull = 0;
 function animate(){
   requestAnimationFrame(animate);
   const now = performance.now(); const dt = Math.min(0.05, (now-lastT)/1000); lastT = now;
@@ -639,12 +734,15 @@ function animate(){
   updateGameLabels(d);
   for (const o of labelObjs){
     const dd = o.position.distanceTo(camera.position);
-    const fade = holesOn ? 0.25 : THREE.MathUtils.clamp((d-4)/40, 0, 1) * THREE.MathUtils.clamp(1 - (dd-30)/220, 0.15, 1);
+    const fade = holesOn ? 0.25 : THREE.MathUtils.clamp((d-3)/25, 0, 1) * THREE.MathUtils.clamp(1 - (dd-60)/260, 0.35, 1);
     o.element.style.opacity = showLabels ? fade : 0;
   }
+  if (now - lastCull > 120){ lastCull = now; cullLabels(labelObjs, 8); }
   composer.render(); labelRenderer.render(scene, camera);
 }
 $('#load').remove();
+try { if (!localStorage.getItem('ideatlas_intro')){ $('#introN').textContent = fmt(N); $('#intro').style.display='grid'; } } catch { }
+$('#introGo').onclick = () => { $('#intro').style.display='none'; try { localStorage.setItem('ideatlas_intro','1'); } catch {} };
 animate();
 </script>
 </body>

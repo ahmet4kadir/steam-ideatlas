@@ -30,6 +30,8 @@ MAX_DRAFTS = int(os.environ.get("MAX_DRAFTS", "3"))
 PER_IP = int(os.environ.get("PER_IP_PER_HOUR", "6"))
 DAILY_CAP = int(os.environ.get("DAILY_CAP", "300"))
 MOCK = os.environ.get("ANTHROPIC_MOCK") == "1"
+TURNSTILE_SECRET = os.environ.get("TURNSTILE_SECRET", "")
+TURNSTILE_SITE_KEY = os.environ.get("TURNSTILE_SITE_KEY", "")
 
 app = FastAPI(title="ideatlas-api")
 S = {}  # state
@@ -107,6 +109,28 @@ def check_limits(ip):
     if day["n"] >= DAILY_CAP: raise HTTPException(429, "Today's idea budget is spent. Come back tomorrow, or browse what others found.")
     q.append(now); day["n"] += 1
 
+async def verify_turnstile(token, ip):
+    """Cloudflare Turnstile: bot koruması. Secret tanımlı değilse atlanır."""
+    if not TURNSTILE_SECRET: return True
+    if not token: return False
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=8) as cl:
+            r = await cl.post("https://challenges.cloudflare.com/turnstile/v0/siteverify",
+                              data={"secret": TURNSTILE_SECRET, "response": token, "remoteip": ip})
+            return bool(r.json().get("success"))
+    except Exception:
+        return False
+
+def cached_idea(mode, src, hole_id):
+    """Aynı kombinasyon daha önce üretildiyse en yenisini döndür (API maliyeti sıfır)."""
+    key = sorted(S["games"][i]["appid"] for i in src)
+    for r in reversed(S["ideas"]):
+        if r["mode"] != mode: continue
+        if mode == "hole" and r.get("hole_id") == hole_id: return r
+        if mode == "blend" and sorted(x["appid"] for x in r["sources"]) == key: return r
+    return None
+
 # ------------------------------------------------------------------ LLM
 SYSTEM = """You are a game designer helping map the space of all Steam games. You write concise, concrete, pitchable game concepts.
 Always answer with strict JSON: {"title": str, "pitch": str, "hook": str, "mechanics": [str, str, str], "tags": [str, ...]}.
@@ -131,14 +155,14 @@ def feedback_prompt(draft, twin, sim, pct, mode, drift):
     msg += "Keep what made it fit the target, change what makes it resemble that game (the core loop, setting, or role of the player). Write a new concept as JSON."
     return msg
 
-async def llm(messages):
+async def llm(messages, api_key=None):
     if MOCK:
         await asyncio.sleep(float(os.environ.get("ANTHROPIC_MOCK_DELAY", "0")))
         n = sum(1 for m in messages if m["role"] == "user")
         return json.dumps({"title": f"Mock Concept {n}", "pitch": f"Draft {n}: you tend a lighthouse that is also a courtroom; ships arrive with disputes and you rule by adjusting the light. Seed {uuid.uuid4().hex[:6]}.",
                            "hook": "Verdicts are navigation.", "mechanics": ["Light patterns as rulings", "Tide-based deadlines", "Reputation with ports"], "tags": ["Simulation", "Narrative", "Cozy", "Puzzle"]})
     from anthropic import AsyncAnthropic
-    cl = AsyncAnthropic()
+    cl = AsyncAnthropic(api_key=api_key) if api_key else AsyncAnthropic()
     r = await cl.messages.create(model=MODEL, max_tokens=700, system=SYSTEM, messages=messages)
     return "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
 
@@ -153,6 +177,8 @@ class IdeaReq(BaseModel):
     mode: str
     appids: list[int] | None = None
     hole_id: int | None = None
+    turnstile: str | None = None
+    fresh: bool = False          # True: önbelleği atla, yeniden üret
 
 def sse(event, data): return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
@@ -172,7 +198,17 @@ async def idea(req: IdeaReq, request: Request):
         src = [S["appid_to_i"][n["appid"]] for n in h["neighbors"] if n["appid"] in S["appid_to_i"]][:8]
         target = S["emb"][src].mean(0); target /= np.linalg.norm(target); extra = ", ".join(h["tags"])
     else: raise HTTPException(400, "mode must be blend or hole")
-    check_limits(ip)
+    own_key = (request.headers.get("x-anthropic-key") or "").strip() or None   # kendi anahtarını getiren: limitsiz, loglanmaz
+    if not own_key:
+        if not req.fresh:
+            hit = cached_idea(req.mode, src, req.hole_id)
+            if hit:
+                async def cached():
+                    yield sse("target", {"mode": req.mode, "cached": True, "sources": [{"appid": S["games"][i]["appid"], "name": S["games"][i]["name"], "pos": [float(x) for x in S["pos"][i]]} for i in src], "pos": hit["final"]["pos"], "max_drafts": 0})
+                    yield sse("final", {**hit, "cached": True})
+                return StreamingResponse(cached(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+        if not await verify_turnstile(req.turnstile, ip): raise HTTPException(403, "Human check failed — reload the page and try again.")
+        check_limits(ip)
 
     async def gen():
         try:
@@ -181,7 +217,7 @@ async def idea(req: IdeaReq, request: Request):
             messages = [{"role": "user", "content": first_prompt(req.mode, [brief(i) for i in src], extra)}]
             drafts = []; best = None
             for n in range(1, MAX_DRAFTS + 1):
-                raw = await llm(messages)
+                raw = await llm(messages, own_key)
                 try: c = parse_json(raw)
                 except Exception: c = {"title": "Untitled", "pitch": raw[:600], "hook": "", "mechanics": [], "tags": []}
                 text = f"{c['title']}. {c['pitch']} {c['hook']} Tags: {', '.join(c['tags'])}. " + " ".join(c["mechanics"])
@@ -207,7 +243,7 @@ async def idea(req: IdeaReq, request: Request):
                 messages += [{"role": "assistant", "content": raw},
                              {"role": "user", "content": feedback_prompt(c, S["games"][ti]["name"], tsim, pct, req.mode, drift)}]
             idea_id = uuid.uuid4().hex[:10]
-            rec = {"id": idea_id, "ts": int(time.time()), "mode": req.mode, "model": MODEL,
+            rec = {"id": idea_id, "ts": int(time.time()), "mode": req.mode, "model": MODEL, "own_key": bool(own_key),
                    "sources": [{"appid": S["games"][i]["appid"], "name": S["games"][i]["name"]} for i in src],
                    "hole_id": req.hole_id, "final": best, "drafts": [{k: d[k] for k in ("n", "title", "twin", "twin_pct", "verdict")} for d in drafts]}
             with open(_ideas_path(), "a", encoding="utf-8") as f: f.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -229,6 +265,9 @@ def idea_get(idea_id: str):
     for r in S["ideas"]:
         if r["id"] == idea_id: return r
     raise HTTPException(404, "not found")
+
+@app.get("/api/config")
+def config(): return {"turnstile_site_key": TURNSTILE_SITE_KEY, "per_ip_per_hour": PER_IP, "max_drafts": MAX_DRAFTS, "byok": True}
 
 @app.get("/api/health")
 def health(): return {"ok": True, "games": len(S.get("games", [])), "ideas": len(S.get("ideas", [])), "model": MODEL, "mock": MOCK}
